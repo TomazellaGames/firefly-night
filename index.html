@@ -1,0 +1,1094 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Firefly Night</title>
+<style>
+  :root{--bg:#07060f;--ink:#f3ecd2;--accent:#ffd34d;--panel:rgba(14,11,32,.92)}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:'Trebuchet MS',system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent}
+  #app{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:8px 16px;gap:10px}
+  #stage{position:relative;width:min(100%, calc((100vh - 180px) * 16 / 9));aspect-ratio:16/9;border-radius:14px;overflow:hidden;box-shadow:0 0 40px rgba(255,200,80,.15);background:#000}
+  svg#scene{width:100%;height:100%;display:block}
+  #hud{position:absolute;inset:0;pointer-events:none}
+  #topbar{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:1.2% 2%;gap:8px;font-size:clamp(11px,1.9vw,17px);text-shadow:0 1px 3px #000}
+  #label{font-weight:bold;letter-spacing:.04em}
+  #right{display:flex;align-items:center;gap:10px}
+  #meter{display:flex;align-items:center;gap:6px}
+  #meter .heart{color:#ff6fae;font-size:1.3em;text-shadow:0 0 8px #ff6fae}
+  #meter .bar{position:relative;width:clamp(70px,16vw,150px);height:clamp(8px,1.4vw,12px);background:rgba(255,255,255,.15);border-radius:8px;overflow:hidden}
+  #meter .fill{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,#ff6fae,#ffd34d);border-radius:8px}
+  #meter .goal{position:absolute;top:0;bottom:0;left:75%;width:2px;background:#fff}
+  .mute{pointer-events:auto;background:rgba(0,0,0,.35);color:var(--ink);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:2px 8px;font:inherit;cursor:pointer}
+  #chips{position:absolute;top:12%;left:50%;transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;width:92%}
+  .chip{height:clamp(24px,5vw,44px);min-width:clamp(24px,5vw,44px);border-radius:10px;background:rgba(10,8,30,.55);border:2px solid rgba(255,230,150,.4);display:flex;align-items:center;justify-content:center;font-size:clamp(13px,2.8vw,24px);font-weight:bold;color:#ffe9a8;padding:0 6px;transition:background .12s,box-shadow .12s,transform .12s}
+  .chip.long{min-width:clamp(50px,10vw,90px)}
+  .chip.long::after{content:'';display:block;height:clamp(3px,.6vw,5px);width:clamp(16px,4vw,36px);background:currentColor;margin-left:4px;border-radius:3px}
+  .chip.ghost{opacity:.45}
+  .chip.cur{border-color:#fff;box-shadow:0 0 12px rgba(255,255,255,.6);transform:translateY(-3px)}
+  .chip.act{background:#ffd34d;color:#2a1a00;box-shadow:0 0 22px #ffd34d;transform:scale(1.12)}
+  .chip.ok{background:rgba(90,209,122,.45);border-color:#7dff9b}
+  .chip.half{background:rgba(230,195,74,.45);border-color:#ffd34d}
+  .chip.bad{background:rgba(224,80,80,.5);border-color:#ff7070}
+  #msg{position:absolute;bottom:4%;left:0;right:0;text-align:center;font-size:clamp(12px,2.3vw,22px);font-weight:bold;text-shadow:0 0 6px #000,0 2px 4px #000;padding:0 4%}
+  #fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .6s}
+  #overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,4,15,.55);padding:3%}
+  #overlay.hidden{display:none}
+  #overlay.low{align-items:flex-end;background:transparent;padding-bottom:2%}
+  .card{background:var(--panel);border:1px solid rgba(255,211,77,.35);border-radius:16px;padding:clamp(10px,2.6vw,24px);max-width:min(580px,94%);max-height:100%;overflow:auto;text-align:center;box-shadow:0 0 30px rgba(255,211,77,.15)}
+  #overlay.low .card{padding:clamp(8px,1.8vw,16px)}
+  .card h1{margin:.1em 0 .2em;color:var(--accent);font-size:clamp(20px,4.6vw,42px);text-shadow:0 0 14px rgba(255,211,77,.6)}
+  .card h2{margin:.1em 0 .3em;color:var(--accent);font-size:clamp(17px,3.4vw,30px)}
+  .card p{font-size:clamp(11px,1.8vw,16px);line-height:1.45;margin:.35em 0}
+  .card .tag{font-style:italic;opacity:.8}
+  .card .warn{color:#ffb38a}
+  .card .big{font-size:clamp(14px,2.6vw,22px);font-weight:bold}
+  .card button{margin-top:.6em;font:inherit;font-size:clamp(14px,2.2vw,20px);font-weight:bold;background:var(--accent);color:#2a1a00;border:0;border-radius:12px;padding:.45em 1.6em;cursor:pointer;box-shadow:0 0 16px rgba(255,211,77,.5)}
+  .card button:focus-visible{outline:3px solid #fff}
+  kbd{background:rgba(255,255,255,.12);border-radius:4px;padding:0 4px;font-family:inherit}
+  #bottom{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;width:min(100%, calc((100vh - 180px) * 16 / 9));flex-shrink:0}
+  #sound{justify-self:start;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:clamp(11px,1.4vw,14px)}
+  #sound input{width:clamp(60px,12vw,120px);accent-color:#ffd34d;touch-action:manipulation;cursor:pointer}
+  #volIcon{width:1.4em;text-align:center}
+  #credits{justify-self:end;text-align:right;font-size:clamp(9px,1.3vw,12px);line-height:1.45;opacity:.8;max-width:250px}
+  #credits a{color:#ffd34d;touch-action:manipulation}
+  #pad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(2,64px);gap:8px;flex-shrink:0}
+  .btn{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:14px;background:#1c1733;border:2px solid #4a3f7a;color:#ffe9a8;font-size:26px;cursor:pointer;touch-action:none;transition:background .08s}
+  .btn small{font-size:10px;opacity:.6;margin-top:-2px}
+  .btn.on{background:#ffd34d;color:#2a1a00;border-color:#fff3b0;box-shadow:0 0 18px #ffd34d}
+  .btn.lng{background:#ff9a3d;box-shadow:0 0 26px #ff9a3d}
+  @media (max-height:520px) and (orientation:landscape){
+    #app{gap:4px;padding:4px 16px}
+    #stage,#bottom{width:min(100%, calc((100vh - 116px) * 16 / 9))}
+    #pad{grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,48px);gap:6px}
+    .btn{font-size:20px}
+  }
+  .flick{animation:flick 2.3s infinite ease-in-out}
+  @keyframes flick{0%,100%{opacity:1}40%{opacity:.8}48%{opacity:.45}55%{opacity:.9}}
+  .twinkle{animation:tw 3s infinite ease-in-out}
+  @keyframes tw{0%,100%{opacity:.9}50%{opacity:.15}}
+  .pulse{animation:pulse 1.2s infinite ease-in-out;transform-box:fill-box;transform-origin:center}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <svg id="scene" viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice"></svg>
+    <div id="hud">
+      <div id="topbar">
+        <div id="label"></div>
+        <div id="right">
+          <div id="meter"><span class="heart">♥</span><div class="bar"><div class="fill"></div><div class="goal"></div></div><span id="pct">0%</span></div>
+          <button id="mute" class="mute" title="Toggle music (M)">♪ on</button>
+        </div>
+      </div>
+      <div id="chips"></div>
+      <div id="msg"></div>
+    </div>
+    <div id="fade"></div>
+    <div id="overlay" class="hidden"><div class="card" id="card"></div></div>
+  </div>
+  <div id="bottom">
+    <div id="sound">
+      <span id="volIcon">🔊</span>
+      <input id="vol" type="range" min="0" max="100" value="80" aria-label="Volume">
+      <button class="mute" title="Toggle music (M)">♪ on</button>
+    </div>
+    <div id="pad">
+      <div class="btn" data-dir="up" style="grid-column:2;grid-row:1">▲<small>W / ↑</small></div>
+      <div class="btn" data-dir="left" style="grid-column:1;grid-row:2">◀<small>A / ←</small></div>
+      <div class="btn" data-dir="down" style="grid-column:2;grid-row:2">▼<small>S / ↓</small></div>
+      <div class="btn" data-dir="right" style="grid-column:3;grid-row:2">▶<small>D / →</small></div>
+    </div>
+    <div id="credits">
+      Made by <a href="https://tomazellagames.itch.io/" target="_blank" rel="noopener">Tomazella Games</a>
+      for the <a href="https://itch.io/jam/goedware-game-jam-halloween-3" target="_blank" rel="noopener">GoedWare Halloween Game Jam</a>,
+      with help from Claude Code.
+      <br><a href="https://github.com/TomazellaGames/firefly-night" target="_blank" rel="noopener">Source code on GitHub</a>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const NS = 'http://www.w3.org/2000/svg';
+const W = 800, H = 450, PY = 350, LONG_MS = 500;
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const store = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const load = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+
+const DIRS = ['up', 'right', 'down', 'left'];
+const DIRV = { up: [0, -1], right: [1, 0], down: [0, 1], left: [-1, 0] };
+const ARROW = { up: '↑', right: '→', down: '↓', left: '←' };
+const DIRNOTE = { up: 79, right: 76, down: 72, left: 69 }; // G5 E5 C5 A4 — C pentatonic
+const HEART = 'M0 5 C -9 -3 -7 -11 0 -6 C 7 -11 9 -3 0 5Z';
+
+// ---------- audio ----------
+const PROG = {
+  night: [{ r: 48, p: [55, 60, 64] }, { r: 45, p: [57, 60, 64] }, { r: 41, p: [57, 60, 65] }, { r: 43, p: [55, 59, 62] }],
+  love:  [{ r: 48, p: [55, 60, 64] }, { r: 41, p: [57, 60, 65] }, { r: 45, p: [57, 60, 64] }, { r: 43, p: [55, 59, 62] }],
+  sad:   [{ r: 45, p: [57, 60, 64] }, { r: 41, p: [57, 60, 65] }, { r: 38, p: [57, 62, 65] }, { r: 40, p: [56, 59, 64] }],
+  day:   [{ r: 45 }, { r: 41 }, { r: 43 }, { r: 40 }],
+};
+const BEAT = { day: .42, night: .6, love: .66, sad: .78 };
+
+const A = {
+  ctx: null, mode: 'night', beatDur: .6, beat: 0, nextBeat: 0, busy: false, musicOn: true, vol: .8,
+  init() {
+    if (this.ctx) { if (this.ctx.state !== 'running') this.ctx.resume(); return; }
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return;
+    const c = this.ctx = new C();
+    const comp = c.createDynamicsCompressor();
+    comp.connect(c.destination);
+    this.master = c.createGain(); this.master.gain.value = this.vol; this.master.connect(comp);
+    this.music = c.createGain(); this.music.gain.value = this.musicOn ? .5 : 0; this.music.connect(this.master);
+    this.sfx = c.createGain(); this.sfx.gain.value = .9; this.sfx.connect(this.master);
+    // simple echo send
+    this.echo = c.createGain();
+    const d = c.createDelay(); d.delayTime.value = .3;
+    const fb = c.createGain(); fb.gain.value = .32;
+    const wet = c.createGain(); wet.gain.value = .3;
+    this.echo.connect(d); d.connect(fb); fb.connect(d); d.connect(wet); wet.connect(this.master);
+    const len = c.sampleRate;
+    this.noise = c.createBuffer(1, len, c.sampleRate);
+    const data = this.noise.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    this.nextBeat = c.currentTime + .1;
+    setInterval(() => this.tick(), 25);
+  },
+  now() { return this.ctx ? this.ctx.currentTime : 0; },
+  setMode(m) { this.mode = m; this.beatDur = BEAT[m] || .6; this.beat = 0; },
+  setMusic(on) {
+    this.musicOn = on;
+    if (this.ctx) this.music.gain.setTargetAtTime(on ? .5 : 0, this.now(), .05);
+    document.querySelectorAll('.mute').forEach(b => { b.textContent = on ? '♪ on' : '♪ off'; });
+    store('ff_music', on ? '1' : '0');
+  },
+  toggleMusic() { this.setMusic(!this.musicOn); },
+  setVolume(v) {
+    this.vol = v;
+    if (this.ctx) this.master.gain.setTargetAtTime(v, this.now(), .03);
+    $('#vol').value = Math.round(v * 100);
+    $('#volIcon').textContent = v === 0 ? '🔇' : v < .4 ? '🔉' : '🔊';
+    store('ff_vol', String(v));
+  },
+  osc(freq, when, dur, o = {}) {
+    const c = this.ctx; if (!c) return;
+    const { type = 'sine', vol = .2, a = .01, r = .12, dest = this.sfx, vib = 0, lp = 0, glide = 0, echo = false } = o;
+    const os = c.createOscillator(); os.type = type;
+    os.frequency.setValueAtTime(freq, when);
+    if (glide) os.frequency.exponentialRampToValueAtTime(glide, when + dur);
+    const g = c.createGain();
+    const hold = Math.max(a, dur);
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(vol, when + a);
+    g.gain.setValueAtTime(vol, when + hold);
+    g.gain.exponentialRampToValueAtTime(.0001, when + hold + r);
+    let node = os;
+    if (lp) { const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; os.connect(f); node = f; }
+    if (vib) {
+      const l = c.createOscillator(); l.frequency.value = 5.5;
+      const lg = c.createGain(); lg.gain.value = vib;
+      l.connect(lg); lg.connect(os.frequency); l.start(when); l.stop(when + hold + r + .05);
+    }
+    node.connect(g); g.connect(dest);
+    if (echo) g.connect(this.echo);
+    os.start(when); os.stop(when + hold + r + .05);
+  },
+  hat(when, vol) {
+    const c = this.ctx; const s = c.createBufferSource(); s.buffer = this.noise;
+    const f = c.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000;
+    const g = c.createGain();
+    g.gain.setValueAtTime(vol, when); g.gain.exponentialRampToValueAtTime(.0001, when + .05);
+    s.connect(f); f.connect(g); g.connect(this.music);
+    s.start(when, Math.random() * .5); s.stop(when + .07);
+  },
+  kick(when, vol) { this.osc(150, when, .14, { vol, a: .003, r: .05, glide: 45, dest: this.music }); },
+  tick() {
+    const c = this.ctx; if (!c || c.state !== 'running') return;
+    if (this.nextBeat < c.currentTime - .05) this.nextBeat = c.currentTime + .05;
+    while (this.nextBeat < c.currentTime + .15) {
+      this.playBeat(this.beat, this.nextBeat);
+      this.nextBeat += this.beatDur; this.beat++;
+    }
+  },
+  // the next beat time on the music grid at or after time t
+  beatAfter(t) {
+    let b = this.nextBeat;
+    while (b - this.beatDur >= t) b -= this.beatDur;
+    while (b < t) b += this.beatDur;
+    return b;
+  },
+  playBeat(b, t) {
+    const m = this.mode, bd = this.beatDur, M = this.music, pos = b % 4;
+    if (m === 'day') {
+      const ch = PROG.day[Math.floor(b / 4) % 4];
+      const bass = [ch.r, ch.r + 12, ch.r + 7, ch.r + 12][pos];
+      this.osc(mtof(bass), t, .07, { type: 'square', vol: .06, lp: 900, r: .08, dest: M });
+      this.hat(t, .025); this.hat(t + bd / 2, .045);
+      if (pos === 0) this.kick(t, .16);
+      if ((pos === 1 || pos === 3) && Math.random() < .55) {
+        const n = pick([69, 72, 74, 76, 79]);
+        this.osc(mtof(n), t + bd / 2, .06, { type: 'triangle', vol: .05, r: .15, dest: M });
+      }
+      return;
+    }
+    const prog = PROG[m] || PROG.night;
+    const ch = prog[Math.floor(b / 4) % prog.length];
+    if (pos === 0) {
+      ch.p.forEach(n => this.osc(mtof(n), t, bd * 3.5, { type: 'triangle', vol: .04, a: .35, r: .9, lp: 1400, dest: M }));
+      this.osc(mtof(ch.r), t, bd * 1.4, { vol: .2, a: .01, r: .3, dest: M });
+      this.osc(mtof(ch.r + 12), t, bd * 1.2, { type: 'triangle', vol: .04, r: .3, dest: M });
+      if (m !== 'sad') this.kick(t, .18);
+    }
+    if (pos === 2) {
+      this.osc(mtof(ch.r + 7), t, bd * .9, { vol: .13, r: .25, dest: M });
+      if (m !== 'sad') this.kick(t, .08);
+    }
+    if (m !== 'sad') this.hat(t + bd / 2, .015);
+    const twProb = m === 'love' ? .7 : m === 'sad' ? .25 : .4;
+    if (!this.busy && Math.random() < twProb) {
+      const n = pick(ch.p) + 24;
+      this.osc(mtof(n), t + (Math.random() < .5 ? 0 : bd / 2), .12, { vol: .03, r: .6, dest: M, echo: true });
+    }
+  },
+  // pattern note (female demo)
+  note(dir, when, dur) {
+    const f = mtof(DIRNOTE[dir]);
+    this.osc(f, when, dur, { vol: .2, a: .015, r: .18, vib: 5, echo: true });
+    this.osc(f * 2, when, dur, { type: 'triangle', vol: .035, a: .015, r: .12 });
+  },
+  // live voice for the player's press, released on stop()
+  startVoice(dir) {
+    const c = this.ctx; if (!c) return { stop() {} };
+    const now = c.currentTime, f = mtof(DIRNOTE[dir]);
+    const os = c.createOscillator(); os.type = 'triangle'; os.frequency.value = f;
+    const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 2600;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(.3, now + .015);
+    os.connect(fl); fl.connect(g); g.connect(this.sfx); g.connect(this.echo);
+    os.start(now);
+    return { stop() { const t = c.currentTime; g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, .04); os.stop(t + .35); } };
+  },
+  longChime(dir) { if (!this.ctx) return; const t = this.now(); this.osc(mtof(DIRNOTE[dir] + 12), t, .05, { vol: .09, r: .25, echo: true }); },
+  miss() { if (!this.ctx) return; this.osc(150, this.now(), .14, { type: 'sawtooth', vol: .08, glide: 90, lp: 900 }); },
+  arp(notes, step = .08, vol = .12, type = 'sine') {
+    if (!this.ctx) return; const t = this.now();
+    notes.forEach((n, i) => this.osc(mtof(n), t + i * step, .1, { type, vol, r: .3, echo: true }));
+  },
+  good() { this.arp([72, 76, 79, 84]); },
+  hearts() { this.arp([84, 88, 91, 96], .06, .08); },
+  sigh() { if (!this.ctx) return; this.osc(330, this.now(), .45, { type: 'triangle', vol: .1, glide: 220, a: .05, r: .2 }); },
+  win() { this.arp([69, 72, 76, 81, 84], .1, .14, 'triangle'); },
+  death() { this.arp([72, 67, 63, 60, 55], .14, .12, 'square'); },
+  croak() {
+    if (!this.ctx) return; const t = this.now();
+    for (let k = 0; k < 2; k++) this.osc(100, t + k * .26, .16, { type: 'sawtooth', vol: .2, glide: 70, lp: 700, a: .02, r: .06 });
+  },
+  alert() { if (!this.ctx) return; this.osc(880, this.now(), .06, { type: 'square', vol: .05, r: .05, lp: 3000 }); },
+  splash() {
+    if (!this.ctx) return;
+    const c = this.ctx, t = c.currentTime;
+    this.osc(420, t, .12, { vol: .2, glide: 120 });
+    const s = c.createBufferSource(); s.buffer = this.noise;
+    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1800;
+    const g = c.createGain();
+    g.gain.setValueAtTime(.25, t); g.gain.exponentialRampToValueAtTime(.0001, t + .3);
+    s.connect(f); f.connect(g); g.connect(this.sfx);
+    s.start(t); s.stop(t + .32);
+  },
+  gulp() { if (!this.ctx) return; this.osc(500, this.now(), .25, { vol: .3, glide: 70, a: .01, r: .1 }); },
+};
+
+// ---------- svg scene ----------
+const svg = $('#scene');
+let world, fxLayer;
+(function initDefs() {
+  const defs = el('defs', {}, svg);
+  const rg = (id, color) => {
+    const g = el('radialGradient', { id }, defs);
+    el('stop', { offset: '0%', 'stop-color': color, 'stop-opacity': 1 }, g);
+    el('stop', { offset: '35%', 'stop-color': color, 'stop-opacity': .5 }, g);
+    el('stop', { offset: '100%', 'stop-color': color, 'stop-opacity': 0 }, g);
+  };
+  rg('gMale', '#d8ff5a'); rg('gFemale', '#ffc94d'); rg('gPump', '#ffa22e'); rg('gMoon', '#fff6d0'); rg('gSun', '#fff3a0');
+  const lg = (id, stops) => {
+    const g = el('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    stops.forEach(([o, c]) => el('stop', { offset: o, 'stop-color': c }, g));
+  };
+  lg('skyN', [['0%', '#05040f'], ['55%', '#1b1440'], ['100%', '#30203f']]);
+  lg('skyD', [['0%', '#7fcaf5'], ['100%', '#dff4ff']]);
+  lg('gold', [['0%', '#fff4b0'], ['45%', '#ffd34d'], ['100%', '#c98d12']]);
+  world = el('g', {}, svg);
+})();
+
+function clearWorld() {
+  world.innerHTML = '';
+  P.length = 0;
+}
+
+function makePumpkin(p, x, y, s, night) {
+  const g = el('g', { transform: `translate(${x},${y}) scale(${s})` }, p);
+  if (night) {
+    const glow = el('circle', { cx: 0, cy: -4, r: 52, fill: 'url(#gPump)', 'fill-opacity': .45, class: 'flick' }, g);
+    glow.style.animationDelay = `${rand(-2, 0)}s`;
+  }
+  const body = night ? '#b9501a' : '#f28a1e', rib = night ? '#94400f' : '#de731a';
+  el('ellipse', { cx: -14, cy: 0, rx: 17, ry: 21, fill: rib }, g);
+  el('ellipse', { cx: 14, cy: 0, rx: 17, ry: 21, fill: rib }, g);
+  el('ellipse', { cx: 0, cy: 0, rx: 19, ry: 23, fill: body }, g);
+  el('rect', { x: -3, y: -29, width: 6, height: 10, rx: 2, fill: night ? '#2f4a1d' : '#4a7a2a' }, g);
+  const face = el('g', { fill: night ? '#ffd84a' : '#5a2a08' }, g);
+  if (night) { face.setAttribute('class', 'flick'); face.style.animationDelay = `${rand(-2, 0)}s`; }
+  el('polygon', { points: '-13,-3 -5,-3 -9,-12' }, face);
+  el('polygon', { points: '5,-3 13,-3 9,-12' }, face);
+  el('path', { d: 'M-12 5 L-8 9 L-4 5 L0 9 L4 5 L8 9 L12 5 L8 13 L-8 13Z' }, face);
+}
+
+function makeTree(p, x, h, night, s = 1) {
+  const g = el('g', { transform: `translate(${x},400) scale(${s})` }, p);
+  el('path', { d: `M-14 0 L-9 ${-h} L9 ${-h} L14 0Z`, fill: night ? '#161020' : '#6b4a2e' }, g);
+  const leaf = night ? '#14231f' : '#4f9a4a';
+  [[-40, -h - 10, 48], [36, -h - 6, 44], [0, -h - 46, 56]].forEach(([cx, cy, r]) => el('circle', { cx, cy, r, fill: leaf }, g));
+}
+
+function buildGrove(night) {
+  el('rect', { x: 0, y: 0, width: W, height: H, fill: night ? 'url(#skyN)' : 'url(#skyD)' }, world);
+  if (night) {
+    for (let i = 0; i < 45; i++) {
+      const s = el('circle', { cx: rand(0, W), cy: rand(0, 250), r: rand(.6, 1.7), fill: '#fff', class: 'twinkle' }, world);
+      s.style.animationDelay = `${rand(-3, 0)}s`;
+    }
+    el('circle', { cx: 680, cy: 80, r: 80, fill: 'url(#gMoon)', opacity: .35 }, world);
+    el('circle', { cx: 680, cy: 80, r: 32, fill: '#fff3c4' }, world);
+    el('circle', { cx: 670, cy: 72, r: 6, fill: '#eadfae' }, world);
+    el('circle', { cx: 692, cy: 92, r: 4, fill: '#eadfae' }, world);
+  } else {
+    el('circle', { cx: 110, cy: 80, r: 80, fill: 'url(#gSun)', opacity: .7 }, world);
+    el('circle', { cx: 110, cy: 80, r: 32, fill: '#fff2a0' }, world);
+    [[260, 70], [520, 50]].forEach(([x, y]) => {
+      const c = el('g', { fill: '#fff', opacity: .85 }, world);
+      el('ellipse', { cx: x, cy: y, rx: 40, ry: 14 }, c);
+      el('ellipse', { cx: x + 22, cy: y - 8, rx: 24, ry: 14 }, c);
+    });
+  }
+  el('path', { d: 'M0 320 Q 200 260 400 310 T 800 290 L800 450 L0 450Z', fill: night ? '#121c1a' : '#86c96f' }, world);
+  makeTree(world, 230, 150, night, .7);
+  makeTree(world, 30, 230, night);
+  makeTree(world, 780, 210, night);
+  el('rect', { x: 0, y: 398, width: W, height: 52, fill: night ? '#0c1611' : '#5aa84a' }, world);
+  [[95, 410, 1.05], [250, 425, .75], [470, 415, .95], [575, 432, .6], [700, 418, 1.15], [360, 436, .55]]
+    .forEach(([x, y, s]) => makePumpkin(world, x, y, s, night));
+  const grass = el('g', { fill: night ? '#13261b' : '#3e8f3a' }, world);
+  for (let x = 0; x < W; x += 13) {
+    const h = rand(12, 26);
+    el('path', { d: `M${x} 450 L${x + 4} ${450 - h} L${x + 8} 450Z` }, grass);
+  }
+}
+
+function makeFirefly(parent, { female = false, scale = 1, day = false } = {}) {
+  const root = el('g', {}, parent);
+  const inner = el('g', { transform: `scale(${scale})` }, root);
+  const glow = el('circle', { cx: -11, cy: 3, r: 26, fill: female ? 'url(#gFemale)' : 'url(#gMale)', opacity: day ? 0 : .5 }, inner);
+  const wingB = el('ellipse', { cx: -2, cy: -9, rx: 11, ry: 4.5, fill: '#dff1ff', opacity: .45 }, inner);
+  el('path', { d: 'M-2 5 L-6 11 M2 5 L1 12 M5 4 L9 10', stroke: '#2b1f17', 'stroke-width': 1.3, fill: 'none' }, inner);
+  const lantern = el('ellipse', { cx: -11, cy: 3, rx: 9.5, ry: 6.5, fill: day ? '#d6cc8a' : (female ? '#ffe08a' : '#efff9a') }, inner);
+  el('ellipse', { cx: 1, cy: 0, rx: 8, ry: 6.5, fill: '#3b2b20' }, inner);
+  el('circle', { cx: 10, cy: -1, r: 5, fill: '#e0603f' }, inner);
+  el('circle', { cx: 12, cy: -2.5, r: 1.8, fill: '#fff' }, inner);
+  el('circle', { cx: 12.6, cy: -2.5, r: .9, fill: '#111' }, inner);
+  el('path', { d: 'M11 -5 Q14 -16 22 -17 M9 -5 Q9 -17 15 -21', stroke: '#2b1f17', 'stroke-width': 1.4, fill: 'none', 'stroke-linecap': 'round' }, inner);
+  if (female) el('path', { d: 'M7 -6 l-5 -4 v8z M7 -6 l5 -4 v8z', fill: '#ff6fae' }, inner);
+  const wingF = el('ellipse', { cx: -3, cy: -8, rx: 12, ry: 5, fill: '#eef8ff', opacity: .7 }, inner);
+  return { root, inner, glow, lantern, wingB, wingF, x: 0, y: 0, tx: 0, ty: 0, face: 1, baseFace: 1, glowT: .35, gc: .35, ph: rand(0, 6), scale };
+}
+function placeFly(f, t) {
+  f.root.setAttribute('transform', `translate(${f.x.toFixed(1)},${f.y.toFixed(1)}) scale(${f.face},1)`);
+  const a = Math.sin(t * 38 + f.ph) * 22;
+  f.wingB.setAttribute('transform', `rotate(${-18 - a} 0 -6)`);
+  f.wingF.setAttribute('transform', `rotate(${-8 + a} 0 -6)`);
+}
+function setGlow(f) {
+  f.glow.setAttribute('opacity', clamp(.15 + f.gc * .6, 0, 1).toFixed(2));
+  f.glow.setAttribute('r', (18 + f.gc * 24).toFixed(1));
+}
+
+// ---------- particles ----------
+const P = [];
+function spark(x, y, color = '#eaff8a') {
+  const c = el('circle', { r: rand(1.5, 3), fill: color }, fxLayer);
+  P.push({ el: c, x, y, vx: rand(-15, 15), vy: rand(-20, 5), life: 0, max: rand(.5, .9), s: 1 });
+}
+function heart(x, y, s = rand(1.3, 2.1)) {
+  const h = el('path', { d: HEART, fill: '#ff6fae' }, fxLayer);
+  P.push({ el: h, x: x + rand(-12, 12), y, vx: rand(-14, 14), vy: rand(-55, -35), life: 0, max: 1.6, s });
+}
+function drip(x, y) {
+  const c = el('ellipse', { rx: 2, ry: 3, fill: '#5ab8ff' }, fxLayer);
+  P.push({ el: c, x, y, vx: rand(-40, 40), vy: rand(-70, 0), g: 520, life: 0, max: rand(.5, .8), s: 1 });
+}
+function updateParticles(dt) {
+  for (let i = P.length - 1; i >= 0; i--) {
+    const p = P[i];
+    p.life += dt;
+    if (p.g) p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+    const k = 1 - p.life / p.max;
+    if (k <= 0) { p.el.remove(); P.splice(i, 1); continue; }
+    p.el.setAttribute('transform', `translate(${p.x.toFixed(1)},${p.y.toFixed(1)}) scale(${p.s})`);
+    p.el.setAttribute('opacity', k.toFixed(2));
+  }
+}
+
+// ---------- HUD ----------
+const chipsEl = $('#chips'), msgEl = $('#msg'), ov = $('#overlay'), card = $('#card'), fadeEl = $('#fade');
+let lastMsg = null;
+function msg(t) { if (t !== lastMsg) { msgEl.textContent = t; lastMsg = t; } }
+function label(t) { $('#label').textContent = t; }
+const say = (t, ms) => { msg(t); return wait(ms); };
+let meterShown = 0;
+function updateMeter(dt) {
+  meterShown += (G.likeness - meterShown) * Math.min(1, dt * 3);
+  if (Math.abs(G.likeness - meterShown) < .05) meterShown = G.likeness;
+  $('#meter .fill').style.width = meterShown + '%';
+  $('#pct').textContent = Math.round(meterShown) + '%';
+}
+function overlay(html, btn = 'Continue', low = false) {
+  return new Promise(res => {
+    ov.className = low ? 'low' : '';
+    card.innerHTML = html + `<div><button id="ovBtn">${btn}</button></div>`;
+    const b = $('#ovBtn');
+    b.onclick = () => { A.init(); ov.className = 'hidden'; res(); };
+    setTimeout(() => b.focus(), 60);
+  });
+}
+function fade(fn) {
+  fadeEl.style.opacity = 1;
+  setTimeout(() => { fn(); fadeEl.style.opacity = 0; }, 650);
+}
+function renderChips(pat, mode) {
+  chipsEl.innerHTML = '';
+  pat.forEach(s => {
+    const c = document.createElement('div');
+    c.className = 'chip';
+    if (mode === 'hidden') c.textContent = '?';
+    else {
+      c.textContent = ARROW[s.dir];
+      if (s.long) c.classList.add('long');
+      if (mode === 'ghost') c.classList.add('ghost');
+    }
+    chipsEl.appendChild(c);
+  });
+}
+function chipClass(i, cls, on) { const c = chipsEl.children[i]; if (c) c.classList.toggle(cls, on); }
+function chipReveal(i, s, score) {
+  const c = chipsEl.children[i]; if (!c) return;
+  c.className = 'chip ' + (s.long ? 'long ' : '') + (score === 1 ? 'ok' : score > 0 ? 'half' : 'bad');
+  c.textContent = ARROW[s.dir];
+}
+
+// ---------- game state ----------
+const G = { day: 1, likeness: 0, easy: false, perfs: [] };
+const WEIGHTS = [25, 30, 45];
+// 60% performance on every night lands exactly on 75% likeness; 100% everywhere = 100%
+const curve = p => p <= .6 ? p * 1.25 : .75 + (p - .6) * .625;
+function newGame() { G.day = 1; G.likeness = 0; G.easy = false; G.perfs = []; }
+let phase = 'title', runToken = 0, tutorialSeen = false;
+let D = null, N = null, E = null;
+
+// ---------- input ----------
+const held = { up: false, right: false, down: false, left: false };
+const btnEl = d => document.querySelector(`.btn[data-dir="${d}"]`);
+function press(d) {
+  if (held[d]) return;
+  held[d] = true; btnEl(d).classList.add('on');
+  if (phase === 'night') nightPress(d);
+}
+function release(d) {
+  if (!held[d]) return;
+  held[d] = false; btnEl(d).classList.remove('on', 'lng');
+  if (phase === 'night') nightRelease(d);
+}
+const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowRight: 'right', KeyD: 'right', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left' };
+addEventListener('keydown', e => {
+  if (e.code === 'KeyM') { A.toggleMusic(); return; }
+  if (!ov.classList.contains('hidden') && (e.code === 'Enter' || e.code === 'Space')) {
+    const b = $('#ovBtn');
+    if (b && document.activeElement !== b) { e.preventDefault(); b.click(); }
+    return;
+  }
+  const d = KEYMAP[e.code];
+  if (d) { e.preventDefault(); if (!e.repeat) press(d); }
+});
+addEventListener('keyup', e => { const d = KEYMAP[e.code]; if (d) release(d); });
+addEventListener('blur', () => DIRS.forEach(release));
+document.querySelectorAll('.btn').forEach(b => {
+  const d = b.dataset.dir;
+  b.addEventListener('pointerdown', e => { e.preventDefault(); A.init(); b.setPointerCapture(e.pointerId); press(d); });
+  const up = () => release(d);
+  b.addEventListener('pointerup', up);
+  b.addEventListener('pointercancel', up);
+  b.addEventListener('lostpointercapture', up);
+  b.addEventListener('contextmenu', e => e.preventDefault());
+});
+document.querySelectorAll('.mute').forEach(b => b.addEventListener('click', () => { A.toggleMusic(); b.blur(); }));
+$('#vol').addEventListener('input', e => A.setVolume(e.target.value / 100));
+$('#vol').addEventListener('change', e => e.target.blur()); // give arrow keys back to the game
+{
+  const v = parseFloat(load('ff_vol'));
+  A.setVolume(isNaN(v) ? .8 : clamp(v, 0, 1));
+  A.setMusic(load('ff_music') !== '0');
+}
+
+// ============ DAY ============
+const DAY_LAYOUTS = [
+  [[40, 90], [160, 90], [275, 85], [390, 85], [505, 85], [615, 85]],
+  [[40, 90], [175, 80], [310, 75, 'enter'], [445, 75], [580, 75]],
+  [[40, 90], [195, 70], [345, 65, 'leave'], [490, 65], [620, 65, 'leave']],
+];
+// Wet leaves fall once the player reaches the previous leaf ('enter') or flies out of it ('leave')
+function dayParams(day, easy) {
+  const k = day - 1;
+  const p = { calmMin: 2.4 - .35 * k, calmMax: 3.6 - .5 * k, warn: 1.1 - .12 * k, look: 1.5 + .2 * k, speed: 160 };
+  if (easy) { p.calmMin += 1.2; p.calmMax += 1.4; p.warn += .4; p.look -= .5; }
+  return p;
+}
+function makeCover(back, front, c, big) {
+  const yTop = big ? 300 : 318, hw = c.w / 2;
+  c.yTop = yTop;
+  c.shadow = el('ellipse', { cx: c.x, cy: PY + 4, rx: hw - 6, ry: 26, fill: '#0b3a12', 'fill-opacity': .2 }, back);
+  el('path', { d: `M${c.x + 4} 445 Q ${c.x - 12} ${yTop + 60} ${c.x} ${yTop + 6}`, stroke: '#2f7a2c', 'stroke-width': big ? 7 : 4, fill: 'none' }, back);
+  c.g = el('g', {}, front);
+  el('path', { d: `M${c.x - hw} ${yTop + 10} Q ${c.x - hw * .3} ${yTop - 26} ${c.x + hw} ${yTop + 4} Q ${c.x} ${yTop + 18} ${c.x - hw} ${yTop + 10}Z`, fill: big ? '#4caf50' : '#3f9a3c', stroke: '#2b6e28', 'stroke-width': 2 }, c.g);
+  el('path', { d: `M${c.x - hw + 6} ${yTop + 9} Q ${c.x} ${yTop - 6} ${c.x + hw - 6} ${yTop + 5}`, stroke: '#8fdc86', 'stroke-width': 1.5, fill: 'none' }, c.g);
+  if (c.wet) {
+    c.water = el('g', {}, c.g);
+    el('ellipse', { cx: c.x - 4, cy: yTop - 4, rx: hw * .45, ry: 5.5, fill: '#5ab8ff', opacity: .9 }, c.water);
+    el('ellipse', { cx: c.x - 10, cy: yTop - 6, rx: hw * .15, ry: 1.6, fill: '#e6f6ff' }, c.water);
+    el('path', { d: `M${c.x + hw * .5} ${yTop - 3} q 4 6 0 8 q -4 -2 0 -8z`, fill: '#5ab8ff', class: 'twinkle' }, c.water);
+  }
+}
+function dropLeaf(c) {
+  c.gone = true; c.dropT = 0;
+  for (let i = 0; i < 14; i++) drip(c.x + rand(-c.w / 3, c.w / 3), c.yTop - 4);
+  c.water.remove();
+  A.splash();
+  D.alertT = 1.8;
+}
+function updateLeaves(dt) {
+  D.covers.forEach(c => {
+    if (c.dropT === undefined || c.dropT > .6) return;
+    c.dropT += dt;
+    const u = Math.min(1, c.dropT / .5);
+    c.g.setAttribute('transform', `translate(0 ${(95 * u * u).toFixed(1)}) rotate(${(18 * u).toFixed(1)} ${c.x} ${c.yTop})`);
+    c.shadow.setAttribute('fill-opacity', (.2 * (1 - u)).toFixed(2));
+  });
+}
+function makeFrog(p, x, y) {
+  const g = el('g', { transform: `translate(${x},${y})` }, p);
+  el('ellipse', { cx: -36, cy: 16, rx: 17, ry: 11, fill: '#3d9440' }, g);
+  el('ellipse', { cx: 36, cy: 16, rx: 17, ry: 11, fill: '#3d9440' }, g);
+  el('ellipse', { cx: 0, cy: 0, rx: 46, ry: 30, fill: '#4caf50' }, g);
+  el('ellipse', { cx: 0, cy: 12, rx: 30, ry: 15, fill: '#bfe39a' }, g);
+  const sac = el('circle', { cx: 0, cy: 20, r: 0, fill: '#eaf8bb', stroke: '#9cc46a', 'stroke-width': 1.5 }, g);
+  el('ellipse', { cx: -22, cy: 28, rx: 10, ry: 4, fill: '#3d9440' }, g);
+  el('ellipse', { cx: 22, cy: 28, rx: 10, ry: 4, fill: '#3d9440' }, g);
+  el('path', { d: 'M-26 2 Q0 14 26 2', stroke: '#24602a', 'stroke-width': 2.5, fill: 'none', 'stroke-linecap': 'round' }, g);
+  const eyes = [], pupils = [], lids = [];
+  [-1, 1].forEach(sx => {
+    const ex = sx * 22, ey = -24;
+    el('circle', { cx: ex, cy: ey, r: 13, fill: '#4caf50' }, g);
+    el('circle', { cx: ex, cy: ey, r: 9.5, fill: '#fff7c2' }, g);
+    pupils.push(el('circle', { cx: ex, cy: ey, r: 4.2, fill: '#111' }, g));
+    lids.push(el('ellipse', { cx: ex, cy: ey, rx: 10.5, ry: 10, fill: '#3f9a43' }, g));
+    eyes.push({ x: ex, y: ey });
+  });
+  const zzz = el('text', { x: 38, y: -40, fill: '#fff', 'font-size': 16, 'font-weight': 'bold' }, g); zzz.textContent = 'z z z';
+  const croak = el('text', { x: 0, y: -48, fill: '#fff', 'font-size': 18, 'font-weight': 'bold', 'text-anchor': 'middle', stroke: '#24602a', 'stroke-width': 3, 'paint-order': 'stroke' }, g); croak.textContent = 'CROAK…';
+  const bang = el('text', { x: 0, y: -46, fill: '#ff3b3b', 'font-size': 36, 'font-weight': 'bold', 'text-anchor': 'middle', stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke' }, g); bang.textContent = '!';
+  return { g, x, y, eyes, pupils, lids, sac, zzz, croak, bang, lid: 1, mouth: { x, y: y + 8 } };
+}
+function frogVisual(fr, fs, target, dt) {
+  const lid = fs === 'sleep' ? 1 : fs === 'warn' ? .55 : 0;
+  fr.lid += (lid - fr.lid) * Math.min(1, dt * 12);
+  fr.lids.forEach(l => l.setAttribute('ry', (10 * fr.lid).toFixed(2)));
+  fr.eyes.forEach((e, i) => {
+    const dx = target.x - (fr.x + e.x), dy = target.y - (fr.y + e.y), d = Math.hypot(dx, dy) || 1;
+    fr.pupils[i].setAttribute('cx', (e.x + dx / d * 4.5).toFixed(1));
+    fr.pupils[i].setAttribute('cy', (e.y + dy / d * 4.5).toFixed(1));
+  });
+  fr.sac.setAttribute('r', fs === 'warn' ? (8 + Math.abs(Math.sin(T * 9)) * 8).toFixed(1) : 0);
+  fr.zzz.setAttribute('opacity', fs === 'sleep' ? (.6 + .4 * Math.sin(T * 3)).toFixed(2) : 0);
+  fr.zzz.setAttribute('y', (-40 + Math.sin(T * 2) * 4).toFixed(1));
+  fr.croak.setAttribute('opacity', fs === 'warn' ? 1 : 0);
+  fr.bang.setAttribute('opacity', fs === 'look' ? 1 : 0);
+}
+function setTongue(on, x2, y2) {
+  const m = D.frog.mouth;
+  D.tongue.setAttribute('visibility', on ? 'visible' : 'hidden');
+  D.tip.setAttribute('visibility', on ? 'visible' : 'hidden');
+  if (!on) return;
+  D.tongue.setAttribute('x1', m.x); D.tongue.setAttribute('y1', m.y);
+  D.tongue.setAttribute('x2', x2); D.tongue.setAttribute('y2', y2);
+  D.tip.setAttribute('cx', x2); D.tip.setAttribute('cy', y2);
+}
+// returns true when the victim has been swallowed
+function tongueStep(k, tgt, victim) {
+  const m = D.frog.mouth;
+  if (k < .15) { const u = k / .15; setTongue(true, m.x + (tgt.x - m.x) * u, m.y + (tgt.y - m.y) * u); return false; }
+  if (k < .45) {
+    const u = 1 - (k - .15) / .3;
+    victim.x = m.x + (tgt.x - m.x) * u; victim.y = m.y + (tgt.y - m.y) * u;
+    setTongue(true, victim.x, victim.y); return false;
+  }
+  setTongue(false); victim.root.style.display = 'none';
+  return true;
+}
+function buildDay() {
+  clearWorld(); buildGrove(false);
+  const back = el('g', {}, world);
+  const covers = DAY_LAYOUTS[G.day - 1].map(([x, w, wet]) => ({ x, w, wet }));
+  // stump + frog
+  el('rect', { x: 362, y: 252, width: 76, height: 75, fill: '#7a5230' }, back);
+  el('ellipse', { cx: 400, cy: 252, rx: 38, ry: 9, fill: '#a87a48' }, back);
+  const frog = makeFrog(back, 400, 228);
+  const goal = { x: 745, w: 120 };
+  el('ellipse', { cx: 752, cy: PY + 24, rx: 62, ry: 11, fill: '#5cc45a', stroke: '#2b6e28', 'stroke-width': 2 }, back);
+  const actors = el('g', {}, world), front = el('g', {}, world);
+  covers.forEach(c => makeCover(back, front, c, false));
+  makeCover(back, front, goal, true);
+  const player = makeFirefly(actors, { day: true, scale: 1.15 });
+  player.x = 40; player.y = PY;
+  const tongue = el('line', { stroke: '#ff5f8a', 'stroke-width': 6, 'stroke-linecap': 'round', visibility: 'hidden' }, front);
+  const tip = el('circle', { r: 7, fill: '#ff3f74', visibility: 'hidden' }, front);
+  fxLayer = el('g', {}, world);
+  D = { covers: [...covers, goal], frog, player, actors, tongue, tip, state: 'wait', fs: 'sleep', ft: 2.6, prm: dayParams(G.day, G.easy), hidden: true, rival: null };
+}
+const isHidden = x => D.covers.some(c => !c.gone && Math.abs(x - c.x) <= c.w / 2 - 8);
+
+async function startDay() {
+  const tok = ++runToken;
+  phase = 'day'; N = null; E = null;
+  buildDay(); A.setMode('day'); A.busy = false;
+  label(`☀ Day ${G.day}/3`); chipsEl.innerHTML = ''; msg('');
+  let html = `<h2>☀ Day ${G.day}</h2>
+    <p>Fly <b>right</b> (<kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd> / buttons) to reach the <b>big leaf</b> on the other side.</p>
+    <p>When the frog <b>croaks</b>, hide <b>under a leaf</b> before it opens its eyes!</p>
+    <p class="tag">If it catches you, you start over from Day 1.</p>`;
+  if (G.day > 1) html += `<p class="warn">💧 Careful: leaves holding water may give way!</p>`;
+  if (G.easy) html += `<p class="warn">She wasn't impressed last night… but luck is on your side: the frog is about to snack on another firefly. Today will be easier.</p>`;
+  await overlay(html, 'Fly!');
+  if (tok !== runToken) return;
+  const tut = G.day === 1 && !tutorialSeen;
+  if (G.easy || tut) {
+    D.state = 'intro'; D.introT = 0; D.rivalHit = false; D.tut = tut;
+    tutorialSeen = true;
+    D.rival = makeFirefly(D.actors, { day: true, scale: 1 });
+    D.rival.x = -30; D.rival.y = tut ? PY - 50 : PY - 80;
+    msg(tut ? 'Watch what happens to this firefly…' : 'Look! Another firefly…');
+  } else {
+    D.state = 'play';
+    msg('Hide under the leaves when the frog croaks!');
+  }
+}
+function updateDay(dt) {
+  const p = D.player;
+  let lookAt = p;
+  if (D.state === 'intro') {
+    const r = D.rival; lookAt = r;
+    if (D.tut) updateTutorial(dt, r);
+    else if (!D.rivalHit) {
+      r.x += 140 * dt; r.y = PY - 80 + Math.sin(T * 5) * 6;
+      if (r.x >= 300) { D.rivalHit = true; D.hitT = 0; D.fs = 'look'; D.tgt = { x: r.x, y: r.y }; A.gulp(); }
+    } else {
+      D.hitT += dt;
+      if (tongueStep(D.hitT, D.tgt, r) && !D.rivalDone) {
+        D.rivalDone = true; D.fs = 'sleep';
+        msg('Gulp! The frog is full and drowsy. Go now!');
+        setTimeout(() => { if (D && D.state === 'intro') { D.state = 'play'; D.ft = D.prm.calmMax; } }, 1200);
+      }
+    }
+    placeFly(r, T);
+  } else if (D.state === 'play') {
+    const dir = (held.right ? 1 : 0) - (held.left ? 1 : 0);
+    p.x = clamp(p.x + dir * D.prm.speed * dt, 15, 785);
+    if (dir) p.face = dir;
+    p.y = PY + Math.sin(T * 5) * 3;
+    D.covers.forEach((c, i) => {
+      if (!c.wet || c.gone) return;
+      const prev = D.covers[i - 1], z = prev.w / 2 - 8;
+      if ((c.wet === 'enter' && p.x >= prev.x - z) || (c.wet === 'leave' && p.x > prev.x + z)) dropLeaf(c);
+    });
+    D.alertT = Math.max(0, (D.alertT || 0) - dt);
+    D.hidden = isHidden(p.x);
+    D.ft -= dt;
+    if (D.fs === 'sleep' && D.ft <= 0) { D.fs = 'warn'; D.ft = D.prm.warn; A.croak(); }
+    else if (D.fs === 'warn' && D.ft <= 0) { D.fs = 'look'; D.ft = D.prm.look; A.alert(); }
+    else if (D.fs === 'look') {
+      if (!D.hidden) {
+        D.state = 'caught'; D.ct = 0; D.tgt = { x: p.x, y: p.y }; A.gulp(); msg('Spotted!');
+      } else if (D.ft <= 0) { D.fs = 'sleep'; D.ft = rand(D.prm.calmMin, D.prm.calmMax); }
+    }
+    if (D.state === 'play') {
+      if (p.x >= 720) winDay();
+      else if (D.alertT > 0 && D.fs !== 'warn') msg('Splash! The wet leaf fell — that hideout is gone!');
+      else if (D.fs === 'sleep') msg(D.hidden ? '🍃 Hidden — the frog is dozing, keep flying!' : 'The frog is dozing… keep flying!');
+      else if (D.fs === 'warn') msg(D.hidden ? '🍃 Hidden — stay put!' : '⚠ CROAK! Get under a leaf!');
+      else msg('🍃 Stay still… it is watching');
+    }
+  } else if (D.state === 'caught') {
+    D.ct += dt;
+    if (tongueStep(D.ct, D.tgt, p) && !D.dead) { D.dead = true; onCaught(); }
+  } else if (D.state === 'won') {
+    p.x += (752 - p.x) * Math.min(1, dt * 4);
+    p.y += (PY + 10 - p.y) * Math.min(1, dt * 4);
+  }
+  updateLeaves(dt);
+  p.root.setAttribute('opacity', D.state === 'play' && D.hidden ? .6 : 1);
+  frogVisual(D.frog, D.fs, lookAt, dt);
+  placeFly(p, T);
+}
+// Day 1 cutscene: another firefly hears the croak, panics into a gap between leaves and gets eaten
+function updateTutorial(dt, r) {
+  if (!D.rivalHit) {
+    if (D.fs === 'sleep') {
+      r.x += 120 * dt; r.y = PY - 50 + Math.sin(T * 5) * 6;
+      if (r.x >= 150) { D.fs = 'warn'; D.ft = 1.5; A.croak(); msg('CROAK! The frog is waking up — hide under a leaf!'); }
+    } else if (D.fs === 'warn') {
+      r.x += (220 - r.x) * Math.min(1, dt * 3) + Math.sin(T * 20) * 1.5;
+      r.y += (PY - r.y) * Math.min(1, dt * 3);
+      D.ft -= dt;
+      if (D.ft <= 0) { D.fs = 'look'; D.ft = .5; A.alert(); msg('Too late — it is not under a leaf!'); }
+    } else {
+      D.ft -= dt;
+      if (D.ft <= 0) { D.rivalHit = true; D.hitT = 0; D.tgt = { x: r.x, y: r.y }; A.gulp(); }
+    }
+  } else {
+    D.hitT += dt;
+    if (tongueStep(D.hitT, D.tgt, r) && !D.rivalDone) {
+      D.rivalDone = true;
+      msg('Gulp! When it croaks, get under a leaf and wait until it dozes off.');
+      setTimeout(() => { if (D && D.state === 'intro') { D.fs = 'sleep'; D.state = 'play'; D.ft = D.prm.calmMax; } }, 2800);
+    }
+  }
+}
+function winDay() {
+  const tok = runToken;
+  D.state = 'won'; D.fs = 'sleep'; A.win(); G.easy = false;
+  msg('Safe on the big leaf! The sun is setting…');
+  setTimeout(() => { if (tok === runToken) fade(() => runNight()); }, 1700);
+}
+function onCaught() {
+  const tok = runToken;
+  A.death();
+  setTimeout(async () => {
+    if (tok !== runToken) return;
+    A.setMode('sad');
+    await overlay(`<h2>Gulp!</h2><p>The frog caught you. Love will have to wait…</p><p class="tag">Everything starts again from Day 1.</p>`, 'Try again');
+    if (tok !== runToken) return;
+    newGame(); startDay();
+  }, 900);
+}
+
+// ============ NIGHT ============
+const NIGHTS = [
+  [[2], [2], [3], [2, 3]],
+  [[3], [4], [3, 4], [2, 4, 5]],
+  [[4], [5], [3, 5], [2, 4, 6, 3]],
+];
+function genPattern(len, night) {
+  const pLong = [.25, .35, .45][night - 1];
+  const pat = [];
+  for (let i = 0; i < len; i++) {
+    let d;
+    do d = pick(DIRS); while (i >= 2 && pat[i - 1].dir === d && pat[i - 2].dir === d);
+    pat.push({ dir: d, long: Math.random() < pLong });
+  }
+  if (len >= 3 && night > 1 && !pat.some(s => s.long)) pick(pat).long = true;
+  if (len >= 3 && pat.every(s => s.long)) pat[0].long = false;
+  return pat;
+}
+function buildNight() {
+  clearWorld(); buildGrove(true);
+  const deco = el('g', {}, world);
+  el('path', { d: 'M612 450 Q 585 340 605 262', stroke: '#1f4a24', 'stroke-width': 6, fill: 'none' }, deco);
+  el('path', { d: 'M565 268 Q 600 240 650 262 Q 605 276 565 268Z', fill: '#24562a', stroke: '#173b1b', 'stroke-width': 2 }, deco);
+  const ambient = [];
+  for (let i = 0; i < 12; i++) {
+    const g = el('g', {}, deco);
+    el('circle', { r: 10, fill: 'url(#gMale)' }, g);
+    el('circle', { r: 1.8, fill: '#f4ffb0' }, g);
+    ambient.push({ el: g, x: rand(20, 780), y: rand(120, 380), s: rand(1, 2.5), p: rand(0, 6), vx: rand(-8, 8) });
+  }
+  const actors = el('g', {}, world);
+  const female = makeFirefly(actors, { female: true, scale: 1.7 });
+  const male = makeFirefly(actors, { scale: 1.7 });
+  fxLayer = el('g', {}, world);
+  const fHome = { x: 610, y: 238 }, mHome = { x: 320, y: 270 };
+  Object.assign(female, { x: fHome.x, y: fHome.y, tx: fHome.x, ty: fHome.y, face: -1, baseFace: -1, base: .45, glowT: .45 });
+  Object.assign(male, { x: mHome.x, y: mHome.y, tx: mHome.x, ty: mHome.y, face: 1, baseFace: 1, base: .35, glowT: .35 });
+  male.home = mHome; female.home = fHome;
+  N = { male, female, ambient, await: null, active: null };
+}
+function flyMove(f, dir, long) {
+  const v = DIRV[dir], k = long ? 1.7 : 1;
+  f.tx = f.home.x + v[0] * 55 * k; f.ty = f.home.y + v[1] * 42 * k;
+  if (v[0]) f.face = v[0];
+  f.glowT = long ? 1.45 : 1;
+}
+function flyRest(f) { f.tx = f.home.x; f.ty = f.home.y; f.face = f.baseFace; f.glowT = f.base; }
+function updateNight(dt) {
+  const now = performance.now();
+  if (N.active && !N.active.long && now - N.active.t0 >= LONG_MS) {
+    N.active.long = true; A.longChime(N.active.dir);
+    btnEl(N.active.dir).classList.add('lng');
+    flyMove(N.male, N.active.dir, true);
+    for (let i = 0; i < 8; i++) spark(N.male.x, N.male.y);
+  }
+  [N.male, N.female].forEach(f => {
+    const k = Math.min(1, dt * 10);
+    f.x += (f.tx - f.x) * k;
+    f.y += (f.ty + Math.sin(T * 2 + f.ph) * 4 - f.y) * k;
+    f.gc += (f.glowT - f.gc) * Math.min(1, dt * 12);
+    setGlow(f); placeFly(f, T);
+  });
+  if (N.male.gc > .7 && Math.random() < dt * 30) spark(N.male.x - 14 * N.male.face, N.male.y + 4);
+  if (N.female.gc > .8 && Math.random() < dt * 30) spark(N.female.x + 14, N.female.y + 4, '#ffd98a');
+  N.ambient.forEach(a => {
+    a.x += a.vx * dt; if (a.x < 0) a.x = W; if (a.x > W) a.x = 0;
+    const o = Math.max(0, Math.sin(T * a.s + a.p));
+    a.el.setAttribute('transform', `translate(${a.x.toFixed(1)},${(a.y + Math.sin(T + a.p) * 8).toFixed(1)})`);
+    a.el.setAttribute('opacity', o.toFixed(2));
+  });
+}
+function nightPress(d) {
+  if (!N || !N.await || N.active) return;
+  N.active = { dir: d, t0: performance.now(), voice: A.startVoice(d), long: false };
+  flyMove(N.male, d, false);
+}
+function nightRelease(d) {
+  if (!N || !N.active || N.active.dir !== d) return;
+  const a = N.active; N.active = null;
+  a.voice.stop(); flyRest(N.male);
+  const r = N.await; N.await = null;
+  if (r) r({ dir: d, long: performance.now() - a.t0 >= LONG_MS });
+}
+const expectInput = () => new Promise(r => { N.await = r; });
+
+async function playDemo(pat) {
+  const tok = runToken;
+  if (!A.ctx) { // no audio: play visuals only
+    for (let i = 0; i < pat.length; i++) {
+      chipClass(i, 'act', true); flyMove(N.female, pat[i].dir, pat[i].long);
+      await wait(pat[i].long ? 900 : 300);
+      chipClass(i, 'act', false); flyRest(N.female);
+      await wait(pat[i].long ? 300 : 300);
+    }
+    return;
+  }
+  const bd = A.beatDur;
+  let t = A.beatAfter(A.now() + .05);
+  const start = A.now();
+  pat.forEach((s, i) => {
+    const dur = s.long ? bd * 1.5 : bd * .38;
+    A.note(s.dir, t, dur);
+    setTimeout(() => { if (tok !== runToken) return; chipClass(i, 'act', true); flyMove(N.female, s.dir, s.long); }, (t - start) * 1000);
+    setTimeout(() => { if (tok !== runToken) return; chipClass(i, 'act', false); flyRest(N.female); }, (t + dur - start) * 1000);
+    t += s.long ? bd * 2 : bd;
+  });
+  await wait((t - start) * 1000 + 120);
+}
+function femaleReact(ratio) {
+  const f = N.female;
+  if (ratio >= .99) { A.hearts(); for (let i = 0; i < 4; i++) setTimeout(() => N && heart(f.x, f.y - 20), i * 120); f.glowT = 1.4; }
+  else if (ratio >= .6) { A.good(); heart(f.x, f.y - 20); f.glowT = 1.1; }
+  else { A.sigh(); f.glowT = .1; }
+  setTimeout(() => { if (N && N.female === f) f.glowT = f.base; }, 700);
+}
+async function runNight() {
+  const tok = ++runToken;
+  const n = G.day;
+  phase = 'night'; D = null; E = null;
+  buildNight(); A.setMode('night'); A.busy = false;
+  label(`☾ Night ${n}/3`); chipsEl.innerHTML = '';
+  const need = Math.max(0, 75 - G.likeness);
+  await say(n === 3 ? `Final night! She needs ${Math.ceil(need)}% more to choose you.` : `Night ${n}. She's watching… copy her light dance!`, 2400);
+  if (tok !== runToken) return;
+  let score = 0, total = 0;
+  const challenges = NIGHTS[n - 1];
+  for (let ci = 0; ci < challenges.length; ci++) {
+    const lens = challenges[ci];
+    await say(lens.length > 1 ? `Challenge ${ci + 1}/${challenges.length} — ${lens.length} patterns in a row!` : `Challenge ${ci + 1}/${challenges.length}`, 1300);
+    if (tok !== runToken) return;
+    for (let pi = 0; pi < lens.length; pi++) {
+      const pat = genPattern(lens[pi], n);
+      const tag = lens.length > 1 ? ` (${pi + 1}/${lens.length})` : '';
+      A.busy = true;
+      renderChips(pat, 'show');
+      msg('Watch her…' + tag);
+      await wait(350);
+      await playDemo(pat);
+      if (tok !== runToken) return;
+      renderChips(pat, n === 1 ? 'ghost' : 'hidden');
+      msg((n === 1 ? 'Your turn! (tap = short, hold = long)' : 'Your turn! From memory…') + tag);
+      let pScore = 0;
+      for (let i = 0; i < pat.length; i++) {
+        chipClass(i, 'cur', true);
+        const inp = await expectInput();
+        if (tok !== runToken) return;
+        const s = inp.dir === pat[i].dir ? (inp.long === pat[i].long ? 1 : .5) : 0;
+        if (s < 1) A.miss();
+        pScore += s;
+        chipReveal(i, pat[i], s);
+      }
+      A.busy = false;
+      score += pScore; total += pat.length;
+      const ratio = pScore / pat.length;
+      femaleReact(ratio);
+      msg(ratio >= .99 ? 'Perfect! ♥' : ratio >= .6 ? 'Nice!' : 'Hmm… not quite.');
+      await wait(1100);
+      if (tok !== runToken) return;
+    }
+  }
+  chipsEl.innerHTML = ''; msg('');
+  const perf = score / total;
+  const gain = WEIGHTS[n - 1] * curve(perf);
+  G.likeness = Math.min(100, G.likeness + gain);
+  G.perfs.push(perf);
+  const pct = Math.round(perf * 100), poor = perf < .6;
+  const mood = perf >= .95 ? 'She is glowing just for you!' : perf >= .6 ? 'She liked your dance!' : 'She looks unimpressed…';
+  let html = `<h2>☾ Night ${n} complete</h2>
+    <p class="big">Performance: ${pct}%</p>
+    <p>${mood}</p>
+    <p>Her likeness: <b>+${Math.round(gain)}%</b> → <b style="color:#ff8fc0">${Math.round(G.likeness)}%</b></p>`;
+  if (n < 3) {
+    html += `<p class="tag">Goal: at least 75% by the end of Night 3.</p>`;
+    if (poor) html += `<p class="warn">Tomorrow the frog will find an easier meal than you…</p>`;
+  }
+  await overlay(html, n < 3 ? 'Sleep until morning' : 'See what happens…');
+  if (tok !== runToken) return;
+  if (n === 3) fade(() => showEnding());
+  else { G.day++; G.easy = poor; fade(() => startDay()); }
+}
+
+// ============ ENDINGS ============
+function buildEnding(type) {
+  clearWorld(); buildGrove(true);
+  const actors = el('g', {}, world);
+  E = { type, flies: [], babies: [] };
+  if (type === 'bad') {
+    el('rect', { x: 0, y: 0, width: W, height: H, fill: '#000', opacity: .35 }, world);
+    el('path', { d: 'M330 238 Q 400 210 470 238 Q 400 250 330 238Z', fill: '#24562a' }, world);
+    const m = makeFirefly(world, { scale: 2.6 });
+    Object.assign(m, { x: 400, y: 210, base: .1, gc: .1, glowT: .1 });
+    m.inner.setAttribute('transform', 'scale(2.6) rotate(18)');
+    const tear = el('ellipse', { cx: 13, cy: 5, rx: 1.6, ry: 2.6, fill: '#8fd0ff' }, m.inner);
+    E.tear = tear; E.flies.push(m);
+  } else {
+    const best = type === 'best';
+    const m = makeFirefly(actors, { scale: 2.2 }), f = makeFirefly(actors, { female: true, scale: 2.2 });
+    Object.assign(m, { x: 350, y: 195, face: 1, base: .9, gc: .9, glowT: .9 });
+    Object.assign(f, { x: 450, y: 195, face: -1, base: .9, gc: .9, glowT: .9 });
+    E.flies.push(m, f);
+    el('path', { d: HEART, fill: '#ff6fae', transform: 'translate(400,138) scale(4)', class: 'pulse' }, actors);
+    const count = best ? 18 : 4;
+    for (let i = 0; i < count; i++) {
+      const b = makeFirefly(actors, { scale: rand(.55, .8) });
+      Object.assign(b, { a: rand(0, 6.28), sp: rand(.5, 1.1) * (Math.random() < .5 ? -1 : 1), rx: rand(110, best ? 340 : 200), ry: rand(30, best ? 100 : 60), gc: .8, glowT: .8 });
+      E.babies.push(b);
+    }
+    if (best) {
+      const b = el('g', { transform: 'translate(400,60)' }, world);
+      el('ellipse', { cx: 0, cy: 0, rx: 300, ry: 70, fill: 'url(#gFemale)', opacity: .5, class: 'flick' }, b);
+      el('path', { d: 'M-235 -14 L-292 -14 L-272 8 L-292 30 L-235 30Z', fill: '#b8860b' }, b);
+      el('path', { d: 'M235 -14 L292 -14 L272 8 L292 30 L235 30Z', fill: '#b8860b' }, b);
+      const defs = el('defs', {}, b);
+      const cp = el('clipPath', { id: 'bannerClip' }, defs);
+      el('rect', { x: -245, y: -32, width: 490, height: 58, rx: 10 }, cp);
+      el('rect', { x: -245, y: -32, width: 490, height: 58, rx: 10, fill: 'url(#gold)', stroke: '#fff3b0', 'stroke-width': 2.5 }, b);
+      const shineG = el('g', { 'clip-path': 'url(#bannerClip)' }, b);
+      const sh = el('rect', { x: -320, y: -40, width: 50, height: 80, fill: '#fff', opacity: .55, transform: 'skewX(-20)' }, shineG);
+      el('animate', { attributeName: 'x', from: -360, to: 360, dur: '2.4s', repeatCount: 'indefinite' }, sh);
+      const tx = el('text', { x: 0, y: 8, 'text-anchor': 'middle', 'font-size': 27, 'font-weight': 'bold', fill: '#5a3600', 'font-family': 'Trebuchet MS, sans-serif' }, b);
+      tx.textContent = '★ 100% PERFECT MATCH ★';
+      for (let i = 0; i < 14; i++) {
+        const s = el('path', { d: 'M0 -6 L1.5 -1.5 L6 0 L1.5 1.5 L0 6 L-1.5 1.5 L-6 0 L-1.5 -1.5Z', fill: '#fff6c0', transform: `translate(${rand(-290, 290)},${rand(-55, 55)})`, class: 'twinkle' }, b);
+        s.style.animationDelay = `${rand(-3, 0)}s`;
+      }
+    }
+  }
+  fxLayer = el('g', {}, world);
+}
+function updateEnding(dt) {
+  E.flies.forEach(f => { f.y += Math.sin(T * 2 + f.ph) * .15; setGlow(f); placeFly(f, T); });
+  if (E.tear) E.tear.setAttribute('cy', (5 + (T * 6) % 10).toFixed(1));
+  E.babies.forEach(b => {
+    b.a += b.sp * dt;
+    const nx = 400 + Math.cos(b.a) * b.rx, ny = 185 + Math.sin(b.a) * b.ry;
+    b.face = nx >= b.x ? 1 : -1; b.x = nx; b.y = ny;
+    b.gc = .5 + .5 * Math.max(0, Math.sin(T * 3 + b.ph));
+    setGlow(b); placeFly(b, T);
+  });
+  if (E.type !== 'bad' && Math.random() < dt * 2) heart(400 + rand(-80, 80), 185, rand(1, 1.6));
+}
+async function showEnding() {
+  const tok = ++runToken;
+  const L = Math.round(G.likeness);
+  const type = L >= 100 ? 'best' : L >= 75 ? 'good' : 'bad';
+  phase = 'ending'; D = null; N = null;
+  buildEnding(type); A.setMode(type === 'bad' ? 'sad' : 'love');
+  chipsEl.innerHTML = ''; msg(''); label('The End');
+  const nights = G.perfs.map((p, i) => `Night ${i + 1}: ${Math.round(p * 100)}%`).join(' · ');
+  const html = {
+    bad: `<h2>Bad Ending — Alone</h2><p>She flew off with another firefly (${L}% likeness). The pumpkins keep glowing, but your nights stay dark…</p>`,
+    good: `<h2>Good Ending — Together ♥</h2><p>She chose you (${L}% likeness)! Before long the grove sparkled with your little ones.</p>`,
+    best: `<h2>Best Ending — 100%! ✨</h2><p>A flawless courtship! Now the whole grove shines with your enormous family.</p>`,
+  }[type] + `<p class="tag">${nights}</p>`;
+  await overlay(html, 'Play again', true);
+  if (tok !== runToken) return;
+  newGame(); fade(() => startDay());
+}
+
+// ============ TITLE & LOOP ============
+async function title() {
+  phase = 'title';
+  buildNight(); label(''); msg('');
+  await overlay(`<h1>Firefly Night</h1>
+    <p class="tag">“It only comes out at night.”</p>
+    <p>You are a lovesick <b>male firefly</b>. In 3 days, you must win the heart of the female who glows above the pumpkin grove.</p>
+    <p>☀ <b>By day</b>, fly across the grove and hide under leaves from the hungry frog.</p>
+    <p>☾ <b>By night</b>, repeat her light dance: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, arrow keys or the buttons.<br>
+       <b>Tap</b> for a short flash <span style="color:#ffd34d">→</span>, <b>hold ½ second</b> for a long one <span style="color:#ffd34d">→━</span>.</p>
+    <p>Reach <b>75%</b> likeness by the third night. Perfection is rewarded…</p>
+    <p class="tag">Press <kbd>M</kbd> to toggle music.</p>`, 'Start');
+  newGame(); fade(() => startDay());
+}
+
+let last = performance.now(), T = 0;
+function loop(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now; T += dt;
+  if (phase === 'day' && D) updateDay(dt);
+  else if ((phase === 'night' || phase === 'title') && N) updateNight(dt);
+  else if (phase === 'ending' && E) updateEnding(dt);
+  updateParticles(dt); updateMeter(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+title();
+</script>
+</body>
+</html>
