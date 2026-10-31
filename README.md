@@ -23,8 +23,9 @@ The game runs in a browser. Nothing to install or build:
 | Confirm dialogs | `Enter` / `Space` | Click the button |
 | Toggle music | `M` | ♪ button |
 | Volume | — | Slider under the stage |
+| Language | — | Menu under the stage |
 
-Your volume and music settings are remembered between sessions.
+The game is available in English, Brazilian Portuguese, Spanish and Simplified Chinese. It starts in your browser's language, and your language, volume and music settings are remembered between sessions.
 
 ## Gameplay
 

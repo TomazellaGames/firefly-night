@@ -7,7 +7,7 @@
 <style>
   :root{--bg:#07060f;--ink:#f3ecd2;--accent:#ffd34d;--panel:rgba(14,11,32,.92)}
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:'Trebuchet MS',system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:'Trebuchet MS',system-ui,'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent}
   #app{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:8px 16px;gap:10px}
   #stage{position:relative;width:min(100%, calc((100vh - 180px) * 16 / 9));aspect-ratio:16/9;border-radius:14px;overflow:hidden;box-shadow:0 0 40px rgba(255,200,80,.15);background:#000}
   svg#scene{width:100%;height:100%;display:block}
@@ -51,6 +51,8 @@
   #sound{justify-self:start;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:clamp(11px,1.4vw,14px)}
   #sound input{width:clamp(60px,12vw,120px);accent-color:#ffd34d;touch-action:manipulation;cursor:pointer}
   #volIcon{width:1.4em;text-align:center}
+  #lang{background:rgba(0,0,0,.35);color:var(--ink);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:2px 4px;font:inherit;cursor:pointer;touch-action:manipulation}
+  #lang option{background:#1c1733}
   #credits{justify-self:end;text-align:right;font-size:clamp(9px,1.3vw,12px);line-height:1.45;opacity:.8;max-width:250px}
   #credits a{color:#ffd34d;touch-action:manipulation}
   #pad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(2,64px);gap:8px;flex-shrink:0}
@@ -95,6 +97,12 @@
       <span id="volIcon">🔊</span>
       <input id="vol" type="range" min="0" max="100" value="80" aria-label="Volume">
       <button class="mute" title="Toggle music (M)">♪ on</button>
+      <select id="lang" aria-label="Language">
+        <option value="en">English</option>
+        <option value="pt-BR">Português (BR)</option>
+        <option value="es">Español</option>
+        <option value="zh-CN">中文</option>
+      </select>
     </div>
     <div id="pad">
       <div class="btn" data-dir="up" style="grid-column:2;grid-row:1">▲<small>W / ↑</small></div>
@@ -102,12 +110,7 @@
       <div class="btn" data-dir="down" style="grid-column:2;grid-row:2">▼<small>S / ↓</small></div>
       <div class="btn" data-dir="right" style="grid-column:3;grid-row:2">▶<small>D / →</small></div>
     </div>
-    <div id="credits">
-      Made by <a href="https://tomazellagames.itch.io/" target="_blank" rel="noopener">Tomazella Games</a>
-      for the <a href="https://itch.io/jam/goedware-game-jam-halloween-3" target="_blank" rel="noopener">GoedWare Halloween Game Jam</a>,
-      with help from Claude Code.
-      <br><a href="https://github.com/TomazellaGames/firefly-night" target="_blank" rel="noopener">Source code on GitHub</a>
-    </div>
+    <div id="credits"></div>
   </div>
 </div>
 
@@ -136,6 +139,267 @@ const DIRV = { up: [0, -1], right: [1, 0], down: [0, 1], left: [-1, 0] };
 const ARROW = { up: '↑', right: '→', down: '↓', left: '←' };
 const DIRNOTE = { up: 79, right: 76, down: 72, left: 69 }; // G5 E5 C5 A4 — C pentatonic
 const HEART = 'M0 5 C -9 -3 -7 -11 0 -6 C 7 -11 9 -3 0 5Z';
+
+// ---------- i18n ----------
+const LINK = {
+  studio: '<a href="https://tomazellagames.itch.io/" target="_blank" rel="noopener">Tomazella Games</a>',
+  jam: '<a href="https://itch.io/jam/goedware-game-jam-halloween-3" target="_blank" rel="noopener">GoedWare Halloween Game Jam</a>',
+  src: 'https://github.com/TomazellaGames/firefly-night',
+};
+const KEYS_WASD = '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>';
+const KEYS_LR = '<kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd>';
+const SHORT = '<span style="color:#ffd34d">→</span>', LONGF = '<span style="color:#ffd34d">→━</span>';
+const STR = {
+  en: {
+    'ui.musicOn': '♪ on', 'ui.musicOff': '♪ off', 'ui.musicTitle': 'Toggle music (M)', 'ui.volume': 'Volume', 'ui.language': 'Language',
+    'ui.credits': 'Made by {studio} for the {jam}, with help from Claude Code.', 'ui.source': 'Source code on GitHub',
+    'title.tag': '“It only comes out at night.”',
+    'title.body': `<p>You are a lovesick <b>male firefly</b>. In 3 days, you must win the heart of the female who glows above the pumpkin grove.</p>
+      <p>☀ <b>By day</b>, fly across the grove and hide under leaves from the hungry frog.</p>
+      <p>☾ <b>By night</b>, repeat her light dance: {wasd}, arrow keys or the buttons.<br>
+      <b>Tap</b> for a short flash {short}, <b>hold ½ second</b> for a long one {long}.</p>
+      <p>Reach <b>75%</b> likeness by the third night. Perfection is rewarded…</p>
+      <p class="tag">Press <kbd>M</kbd> to toggle music.</p>`,
+    'title.start': 'Start',
+    'day.label': '☀ Day {d}/3', 'day.h': '☀ Day {d}',
+    'day.p1': 'Fly <b>right</b> ({lr} / buttons) to reach the <b>big leaf</b> on the other side.',
+    'day.p2': 'When the frog <b>croaks</b>, hide <b>under a leaf</b> before it opens its eyes!',
+    'day.p3': 'If it catches you, you start over from Day 1.',
+    'day.wet': '💧 Careful: leaves holding water may give way!',
+    'day.easy': 'She wasn’t impressed last night… but luck is on your side: the frog is about to snack on another firefly. Today will be easier.',
+    'day.go': 'Fly!',
+    'frog.croak': 'CROAK…',
+    'msg.tutWatch': 'Watch what happens to this firefly…',
+    'msg.rival': 'Look! Another firefly…',
+    'msg.hide': 'Hide under the leaves when the frog croaks!',
+    'msg.gulpFull': 'Gulp! The frog is full and drowsy. Go now!',
+    'msg.spotted': 'Spotted!',
+    'msg.splash': 'Splash! The wet leaf fell — that hideout is gone!',
+    'msg.dozeHidden': '🍃 Hidden — the frog is dozing, keep flying!',
+    'msg.doze': 'The frog is dozing… keep flying!',
+    'msg.warnHidden': '🍃 Hidden — stay put!',
+    'msg.warn': '⚠ CROAK! Get under a leaf!',
+    'msg.look': '🍃 Stay still… it is watching',
+    'msg.tutCroak': 'CROAK! The frog is waking up — hide under a leaf!',
+    'msg.tutLate': 'Too late — it is not under a leaf!',
+    'msg.tutGulp': 'Gulp! When it croaks, get under a leaf and wait until it dozes off.',
+    'msg.safe': 'Safe on the big leaf! The sun is setting…',
+    'caught.html': '<h2>Gulp!</h2><p>The frog caught you. Love will have to wait…</p><p class="tag">Everything starts again from Day 1.</p>',
+    'caught.btn': 'Try again',
+    'night.label': '☾ Night {n}/3',
+    'msg.finalNight': 'Final night! She needs {need}% more to choose you.',
+    'msg.nightStart': 'Night {n}. She’s watching… copy her light dance!',
+    'msg.challengeMulti': 'Challenge {i}/{t} — {k} patterns in a row!',
+    'msg.challenge': 'Challenge {i}/{t}',
+    'msg.watch': 'Watch her…{tag}',
+    'msg.yourTurn1': 'Your turn! (tap = short, hold = long){tag}',
+    'msg.yourTurn': 'Your turn! From memory…{tag}',
+    'msg.perfect': 'Perfect! ♥', 'msg.nice': 'Nice!', 'msg.notQuite': 'Hmm… not quite.',
+    'mood.great': 'She is glowing just for you!', 'mood.good': 'She liked your dance!', 'mood.poor': 'She looks unimpressed…',
+    'night.h': '☾ Night {n} complete', 'night.perf': 'Performance: {p}%',
+    'night.like': 'Her likeness: <b>+{g}%</b> → <b style="color:#ff8fc0">{l}%</b>',
+    'night.goal': 'Goal: at least 75% by the end of Night 3.',
+    'night.poor': 'Tomorrow the frog will find an easier meal than you…',
+    'night.sleep': 'Sleep until morning', 'night.end': 'See what happens…',
+    'end.label': 'The End', 'end.night': 'Night {i}: {p}%',
+    'end.bad': '<h2>Bad Ending — Alone</h2><p>She flew off with another firefly ({l}% likeness). The pumpkins keep glowing, but your nights stay dark…</p>',
+    'end.good': '<h2>Good Ending — Together ♥</h2><p>She chose you ({l}% likeness)! Before long the grove sparkled with your little ones.</p>',
+    'end.best': '<h2>Best Ending — 100%! ✨</h2><p>A flawless courtship! Now the whole grove shines with your enormous family.</p>',
+    'end.banner': '★ 100% PERFECT MATCH ★',
+    'end.again': 'Play again',
+  },
+  'pt-BR': {
+    'ui.musicOn': '♪ sim', 'ui.musicOff': '♪ não', 'ui.musicTitle': 'Ligar/desligar música (M)', 'ui.volume': 'Volume', 'ui.language': 'Idioma',
+    'ui.credits': 'Feito por {studio} para a {jam}, com ajuda do Claude Code.', 'ui.source': 'Código-fonte no GitHub',
+    'title.tag': '“Só aparece à noite.”',
+    'title.body': `<p>Você é um <b>vaga-lume macho</b> apaixonado. Em 3 dias, precisa conquistar o coração da fêmea que brilha sobre o bosque das abóboras.</p>
+      <p>☀ <b>De dia</b>, atravesse o bosque voando e se esconda sob as folhas para fugir do sapo faminto.</p>
+      <p>☾ <b>À noite</b>, repita a dança de luz dela: {wasd}, setas ou os botões.<br>
+      <b>Toque</b> para um brilho curto {short}, <b>segure ½ segundo</b> para um longo {long}.</p>
+      <p>Alcance <b>75%</b> de afeição até a terceira noite. A perfeição é recompensada…</p>
+      <p class="tag">Aperte <kbd>M</kbd> para ligar/desligar a música.</p>`,
+    'title.start': 'Começar',
+    'day.label': '☀ Dia {d}/3', 'day.h': '☀ Dia {d}',
+    'day.p1': 'Voe para a <b>direita</b> ({lr} / botões) até a <b>folha grande</b> do outro lado.',
+    'day.p2': 'Quando o sapo <b>coaxar</b>, esconda-se <b>debaixo de uma folha</b> antes que ele abra os olhos!',
+    'day.p3': 'Se ele te pegar, você recomeça do Dia 1.',
+    'day.wet': '💧 Cuidado: folhas com água podem ceder!',
+    'day.easy': 'Ela não ficou impressionada ontem à noite… mas a sorte está do seu lado: o sapo vai fazer um lanchinho de outro vaga-lume. Hoje vai ser mais fácil.',
+    'day.go': 'Voar!',
+    'frog.croak': 'CROAC…',
+    'msg.tutWatch': 'Veja o que acontece com este vaga-lume…',
+    'msg.rival': 'Olha! Outro vaga-lume…',
+    'msg.hide': 'Esconda-se sob as folhas quando o sapo coaxar!',
+    'msg.gulpFull': 'Glup! O sapo está cheio e sonolento. Vai agora!',
+    'msg.spotted': 'Te viu!',
+    'msg.splash': 'Splash! A folha molhada caiu — esse esconderijo já era!',
+    'msg.dozeHidden': '🍃 Escondido — o sapo está cochilando, continue voando!',
+    'msg.doze': 'O sapo está cochilando… continue voando!',
+    'msg.warnHidden': '🍃 Escondido — fique parado!',
+    'msg.warn': '⚠ CROAC! Entre debaixo de uma folha!',
+    'msg.look': '🍃 Fique quieto… ele está olhando',
+    'msg.tutCroak': 'CROAC! O sapo está acordando — esconda-se debaixo de uma folha!',
+    'msg.tutLate': 'Tarde demais — ele não está debaixo de uma folha!',
+    'msg.tutGulp': 'Glup! Quando o sapo coaxar, fique debaixo de uma folha e espere até ele cochilar.',
+    'msg.safe': 'A salvo na folha grande! O sol está se pondo…',
+    'caught.html': '<h2>Glup!</h2><p>O sapo te pegou. O amor vai ter que esperar…</p><p class="tag">Tudo recomeça do Dia 1.</p>',
+    'caught.btn': 'Tentar de novo',
+    'night.label': '☾ Noite {n}/3',
+    'msg.finalNight': 'Última noite! Ela precisa de mais {need}% para te escolher.',
+    'msg.nightStart': 'Noite {n}. Ela está olhando… copie a dança de luz dela!',
+    'msg.challengeMulti': 'Desafio {i}/{t} — {k} padrões seguidos!',
+    'msg.challenge': 'Desafio {i}/{t}',
+    'msg.watch': 'Observe-a…{tag}',
+    'msg.yourTurn1': 'Sua vez! (toque = curto, segure = longo){tag}',
+    'msg.yourTurn': 'Sua vez! De memória…{tag}',
+    'msg.perfect': 'Perfeito! ♥', 'msg.nice': 'Boa!', 'msg.notQuite': 'Hmm… não foi bem isso.',
+    'mood.great': 'Ela está brilhando só para você!', 'mood.good': 'Ela gostou da sua dança!', 'mood.poor': 'Ela não parece impressionada…',
+    'night.h': '☾ Noite {n} concluída', 'night.perf': 'Desempenho: {p}%',
+    'night.like': 'Afeição dela: <b>+{g}%</b> → <b style="color:#ff8fc0">{l}%</b>',
+    'night.goal': 'Meta: pelo menos 75% até o fim da Noite 3.',
+    'night.poor': 'Amanhã o sapo vai achar uma refeição mais fácil que você…',
+    'night.sleep': 'Dormir até de manhã', 'night.end': 'Ver o que acontece…',
+    'end.label': 'Fim', 'end.night': 'Noite {i}: {p}%',
+    'end.bad': '<h2>Final Ruim — Sozinho</h2><p>Ela voou com outro vaga-lume ({l}% de afeição). As abóboras continuam brilhando, mas suas noites ficam escuras…</p>',
+    'end.good': '<h2>Final Bom — Juntos ♥</h2><p>Ela escolheu você ({l}% de afeição)! Logo o bosque brilhava com os seus filhotinhos.</p>',
+    'end.best': '<h2>Melhor Final — 100%! ✨</h2><p>Uma conquista impecável! Agora o bosque inteiro brilha com a sua enorme família.</p>',
+    'end.banner': '★ PAR PERFEITO: 100% ★',
+    'end.again': 'Jogar de novo',
+  },
+  es: {
+    'ui.musicOn': '♪ sí', 'ui.musicOff': '♪ no', 'ui.musicTitle': 'Activar/desactivar música (M)', 'ui.volume': 'Volumen', 'ui.language': 'Idioma',
+    'ui.credits': 'Hecho por {studio} para la {jam}, con ayuda de Claude Code.', 'ui.source': 'Código fuente en GitHub',
+    'title.tag': '“Solo sale de noche.”',
+    'title.body': `<p>Eres un <b>macho de luciérnaga</b> perdidamente enamorado. En 3 días debes conquistar el corazón de la hembra que brilla sobre la arboleda de calabazas.</p>
+      <p>☀ <b>De día</b>, cruza la arboleda volando y escóndete bajo las hojas de la rana hambrienta.</p>
+      <p>☾ <b>De noche</b>, repite su danza de luz: {wasd}, flechas o los botones.<br>
+      <b>Toca</b> para un destello corto {short}, <b>mantén ½ segundo</b> para uno largo {long}.</p>
+      <p>Alcanza un <b>75%</b> de afecto antes de la tercera noche. La perfección tiene premio…</p>
+      <p class="tag">Pulsa <kbd>M</kbd> para activar o desactivar la música.</p>`,
+    'title.start': 'Empezar',
+    'day.label': '☀ Día {d}/3', 'day.h': '☀ Día {d}',
+    'day.p1': 'Vuela a la <b>derecha</b> ({lr} / botones) hasta la <b>hoja grande</b> del otro lado.',
+    'day.p2': 'Cuando la rana <b>croe</b>, ¡escóndete <b>bajo una hoja</b> antes de que abra los ojos!',
+    'day.p3': 'Si te atrapa, empiezas de nuevo desde el Día 1.',
+    'day.wet': '💧 Cuidado: ¡las hojas con agua pueden ceder!',
+    'day.easy': 'Anoche no la impresionaste… pero la suerte está de tu lado: la rana está a punto de merendarse a otra luciérnaga. Hoy será más fácil.',
+    'day.go': '¡A volar!',
+    'frog.croak': 'CROAC…',
+    'msg.tutWatch': 'Mira lo que le pasa a esta luciérnaga…',
+    'msg.rival': '¡Mira! Otra luciérnaga…',
+    'msg.hide': '¡Escóndete bajo las hojas cuando la rana croe!',
+    'msg.gulpFull': '¡Glup! La rana está llena y adormilada. ¡Ahora!',
+    'msg.spotted': '¡Te vio!',
+    'msg.splash': '¡Splash! La hoja mojada cayó: ¡ese escondite ya no existe!',
+    'msg.dozeHidden': '🍃 Escondido: la rana dormita, ¡sigue volando!',
+    'msg.doze': 'La rana dormita… ¡sigue volando!',
+    'msg.warnHidden': '🍃 Escondido: ¡no te muevas!',
+    'msg.warn': '⚠ ¡CROAC! ¡Métete bajo una hoja!',
+    'msg.look': '🍃 Quieto… te está vigilando',
+    'msg.tutCroak': '¡CROAC! La rana se está despertando: ¡escóndete bajo una hoja!',
+    'msg.tutLate': '¡Demasiado tarde! No está bajo una hoja.',
+    'msg.tutGulp': '¡Glup! Cuando la rana croe, métete bajo una hoja y espera a que vuelva a dormirse.',
+    'msg.safe': '¡A salvo en la hoja grande! El sol se está poniendo…',
+    'caught.html': '<h2>¡Glup!</h2><p>La rana te atrapó. El amor tendrá que esperar…</p><p class="tag">Todo vuelve a empezar desde el Día 1.</p>',
+    'caught.btn': 'Reintentar',
+    'night.label': '☾ Noche {n}/3',
+    'msg.finalNight': '¡Última noche! Necesita {need}% más para elegirte.',
+    'msg.nightStart': 'Noche {n}. Te está mirando… ¡copia su danza de luz!',
+    'msg.challengeMulti': 'Desafío {i}/{t}: ¡{k} patrones seguidos!',
+    'msg.challenge': 'Desafío {i}/{t}',
+    'msg.watch': 'Obsérvala…{tag}',
+    'msg.yourTurn1': '¡Tu turno! (toca = corto, mantén = largo){tag}',
+    'msg.yourTurn': '¡Tu turno! De memoria…{tag}',
+    'msg.perfect': '¡Perfecto! ♥', 'msg.nice': '¡Bien!', 'msg.notQuite': 'Mmm… no del todo.',
+    'mood.great': '¡Brilla solo para ti!', 'mood.good': '¡Le gustó tu danza!', 'mood.poor': 'No parece impresionada…',
+    'night.h': '☾ Noche {n} completada', 'night.perf': 'Rendimiento: {p}%',
+    'night.like': 'Su afecto: <b>+{g}%</b> → <b style="color:#ff8fc0">{l}%</b>',
+    'night.goal': 'Meta: al menos 75% al final de la Noche 3.',
+    'night.poor': 'Mañana la rana encontrará una presa más fácil que tú…',
+    'night.sleep': 'Dormir hasta el amanecer', 'night.end': 'Ver qué pasa…',
+    'end.label': 'Fin', 'end.night': 'Noche {i}: {p}%',
+    'end.bad': '<h2>Final malo: Solo</h2><p>Se fue volando con otra luciérnaga ({l}% de afecto). Las calabazas siguen brillando, pero tus noches siguen a oscuras…</p>',
+    'end.good': '<h2>Final bueno: Juntos ♥</h2><p>¡Te eligió a ti ({l}% de afecto)! Muy pronto la arboleda brillaba con tus pequeños.</p>',
+    'end.best': '<h2>Mejor final: ¡100%! ✨</h2><p>¡Un cortejo impecable! Ahora toda la arboleda brilla con tu enorme familia.</p>',
+    'end.banner': '★ PAREJA PERFECTA: 100% ★',
+    'end.again': 'Jugar de nuevo',
+  },
+  'zh-CN': {
+    'ui.musicOn': '♪ 开', 'ui.musicOff': '♪ 关', 'ui.musicTitle': '开关音乐 (M)', 'ui.volume': '音量', 'ui.language': '语言',
+    'ui.credits': '由 {studio} 为 {jam} 制作，Claude Code 协助开发。', 'ui.source': 'GitHub 源代码',
+    'title.tag': '“它只在夜里出现。”',
+    'title.body': `<p>你是一只害了相思的<b>雄萤火虫</b>。你必须在 3 天内赢得那只在南瓜林上空闪耀的雌萤火虫的芳心。</p>
+      <p>☀ <b>白天</b>，飞越南瓜林，躲在叶子下面避开饥饿的青蛙。</p>
+      <p>☾ <b>夜晚</b>，重复她的光之舞：{wasd}、方向键或按钮。<br>
+      <b>轻点</b>为短闪 {short}，<b>按住半秒</b>为长闪 {long}。</p>
+      <p>在第三夜结束前让好感度达到 <b>75%</b>。完美会有奖励……</p>
+      <p class="tag">按 <kbd>M</kbd> 开关音乐。</p>`,
+    'title.start': '开始',
+    'day.label': '☀ 第 {d}/3 天', 'day.h': '☀ 第 {d} 天',
+    'day.p1': '向<b>右</b>飞（{lr} / 按钮），抵达另一边的<b>大叶子</b>。',
+    'day.p2': '青蛙<b>呱呱叫</b>时，要在它睁眼前躲到<b>叶子下面</b>！',
+    'day.p3': '被它抓到的话，就要从第 1 天重新开始。',
+    'day.wet': '💧 小心：盛着水的叶子可能会掉落！',
+    'day.easy': '昨晚她不太满意……不过幸运站在你这边：青蛙正要吃掉另一只萤火虫。今天会轻松一些。',
+    'day.go': '出发！',
+    'frog.croak': '呱……',
+    'msg.tutWatch': '看看这只萤火虫会怎么样……',
+    'msg.rival': '看！又一只萤火虫……',
+    'msg.hide': '青蛙呱呱叫时，躲到叶子下面！',
+    'msg.gulpFull': '咕嘟！青蛙吃饱了，昏昏欲睡。快走！',
+    'msg.spotted': '被发现了！',
+    'msg.splash': '哗啦！湿叶子掉下去了——那个藏身处没了！',
+    'msg.dozeHidden': '🍃 已躲好——青蛙在打盹，继续飞！',
+    'msg.doze': '青蛙在打盹……继续飞！',
+    'msg.warnHidden': '🍃 已躲好——别动！',
+    'msg.warn': '⚠ 呱！快躲到叶子下面！',
+    'msg.look': '🍃 别动……它在盯着',
+    'msg.tutCroak': '呱！青蛙要醒了——快躲到叶子下面！',
+    'msg.tutLate': '太晚了——它没躲在叶子下面！',
+    'msg.tutGulp': '咕嘟！青蛙叫的时候，躲到叶子下面，等它重新打盹。',
+    'msg.safe': '安全抵达大叶子！太阳快下山了……',
+    'caught.html': '<h2>咕嘟！</h2><p>青蛙抓住了你。爱情只能再等等了……</p><p class="tag">一切从第 1 天重新开始。</p>',
+    'caught.btn': '再试一次',
+    'night.label': '☾ 第 {n}/3 夜',
+    'msg.finalNight': '最后一夜！她还需要 {need}% 才会选择你。',
+    'msg.nightStart': '第 {n} 夜。她在看着你……模仿她的光之舞！',
+    'msg.challengeMulti': '挑战 {i}/{t}——连续 {k} 段图案！',
+    'msg.challenge': '挑战 {i}/{t}',
+    'msg.watch': '仔细看她……{tag}',
+    'msg.yourTurn1': '轮到你了！（轻点 = 短，按住 = 长）{tag}',
+    'msg.yourTurn': '轮到你了！凭记忆……{tag}',
+    'msg.perfect': '完美！♥', 'msg.nice': '不错！', 'msg.notQuite': '嗯……不太对。',
+    'mood.great': '她只为你闪耀！', 'mood.good': '她喜欢你的舞！', 'mood.poor': '她看起来不太感兴趣……',
+    'night.h': '☾ 第 {n} 夜结束', 'night.perf': '表现：{p}%',
+    'night.like': '她的好感度：<b>+{g}%</b> → <b style="color:#ff8fc0">{l}%</b>',
+    'night.goal': '目标：第 3 夜结束时至少达到 75%。',
+    'night.poor': '明天青蛙会找到比你更容易得手的猎物……',
+    'night.sleep': '睡到天亮', 'night.end': '看看结局……',
+    'end.label': '终', 'end.night': '第 {i} 夜：{p}%',
+    'end.bad': '<h2>坏结局——孤单</h2><p>她和另一只萤火虫飞走了（好感度 {l}%）。南瓜依旧闪亮，你的夜晚却一片黑暗……</p>',
+    'end.good': '<h2>好结局——在一起 ♥</h2><p>她选择了你（好感度 {l}%）！不久，南瓜林里便闪烁着你们的小宝宝。</p>',
+    'end.best': '<h2>最佳结局——100%！✨</h2><p>完美无瑕的求爱！如今整片南瓜林都闪耀着你们的大家庭。</p>',
+    'end.banner': '★ 100% 天生一对 ★',
+    'end.again': '再玩一次',
+  },
+};
+function detectLang() {
+  const saved = load('ff_lang');
+  if (saved && STR[saved]) return saved;
+  for (const l of navigator.languages || [navigator.language || '']) {
+    const p = l.toLowerCase();
+    if (p.startsWith('pt')) return 'pt-BR';
+    if (p.startsWith('es')) return 'es';
+    if (p.startsWith('zh')) return 'zh-CN';
+    if (p.startsWith('en')) return 'en';
+  }
+  return 'en';
+}
+let LANG = detectLang();
+function t(k, p = {}) {
+  const s = STR[LANG][k] ?? STR.en[k] ?? k;
+  return s.replace(/\{(\w+)\}/g, (_, n) => p[n] ?? '');
+}
 
 // ---------- audio ----------
 const PROG = {
@@ -176,7 +440,7 @@ const A = {
   setMusic(on) {
     this.musicOn = on;
     if (this.ctx) this.music.gain.setTargetAtTime(on ? .5 : 0, this.now(), .05);
-    document.querySelectorAll('.mute').forEach(b => { b.textContent = on ? '♪ on' : '♪ off'; });
+    document.querySelectorAll('.mute').forEach(b => { b.textContent = t(on ? 'ui.musicOn' : 'ui.musicOff'); });
     store('ff_music', on ? '1' : '0');
   },
   toggleMusic() { this.setMusic(!this.musicOn); },
@@ -456,10 +720,15 @@ function updateParticles(dt) {
 
 // ---------- HUD ----------
 const chipsEl = $('#chips'), msgEl = $('#msg'), ov = $('#overlay'), card = $('#card'), fadeEl = $('#fade');
-let lastMsg = null;
-function msg(t) { if (t !== lastMsg) { msgEl.textContent = t; lastMsg = t; } }
-function label(t) { $('#label').textContent = t; }
-const say = (t, ms) => { msg(t); return wait(ms); };
+// msg/label take a string key + params so they can be re-rendered when the language changes
+let lastMsg = null, msgArgs = [''], labelArgs = [''];
+function msg(k, p) {
+  msgArgs = [k, p];
+  const s = k ? t(k, p) : '';
+  if (s !== lastMsg) { msgEl.textContent = s; lastMsg = s; }
+}
+function label(k, p) { labelArgs = [k, p]; $('#label').textContent = k ? t(k, p) : ''; }
+const say = (ms, k, p) => { msg(k, p); return wait(ms); };
 let meterShown = 0;
 function updateMeter(dt) {
   meterShown += (G.likeness - meterShown) * Math.min(1, dt * 3);
@@ -467,13 +736,17 @@ function updateMeter(dt) {
   $('#meter .fill').style.width = meterShown + '%';
   $('#pct').textContent = Math.round(meterShown) + '%';
 }
-function overlay(html, btn = 'Continue', low = false) {
+// html and btn are functions so the open card can be redrawn in another language
+let ovDraw = null;
+function overlay(html, btn, low = false) {
   return new Promise(res => {
     ov.className = low ? 'low' : '';
-    card.innerHTML = html + `<div><button id="ovBtn">${btn}</button></div>`;
-    const b = $('#ovBtn');
-    b.onclick = () => { A.init(); ov.className = 'hidden'; res(); };
-    setTimeout(() => b.focus(), 60);
+    ovDraw = () => {
+      card.innerHTML = html() + `<div><button id="ovBtn">${btn()}</button></div>`;
+      $('#ovBtn').onclick = () => { A.init(); ov.className = 'hidden'; ovDraw = null; res(); };
+    };
+    ovDraw();
+    setTimeout(() => { const b = $('#ovBtn'); if (b) b.focus(); }, 60);
   });
 }
 function fade(fn) {
@@ -525,6 +798,7 @@ function release(d) {
 }
 const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowRight: 'right', KeyD: 'right', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left' };
 addEventListener('keydown', e => {
+  if (e.target.tagName === 'SELECT') return;
   if (e.code === 'KeyM') { A.toggleMusic(); return; }
   if (!ov.classList.contains('hidden') && (e.code === 'Enter' || e.code === 'Space')) {
     const b = $('#ovBtn');
@@ -553,6 +827,23 @@ $('#vol').addEventListener('change', e => e.target.blur()); // give arrow keys b
   A.setVolume(isNaN(v) ? .8 : clamp(v, 0, 1));
   A.setMusic(load('ff_music') !== '0');
 }
+function applyLang() {
+  document.documentElement.lang = LANG;
+  $('#lang').value = LANG;
+  $('#lang').setAttribute('aria-label', t('ui.language'));
+  $('#lang').title = t('ui.language');
+  $('#vol').setAttribute('aria-label', t('ui.volume'));
+  document.querySelectorAll('.mute').forEach(b => { b.title = t('ui.musicTitle'); b.textContent = t(A.musicOn ? 'ui.musicOn' : 'ui.musicOff'); });
+  $('#credits').innerHTML = t('ui.credits', LINK) + `<br><a href="${LINK.src}" target="_blank" rel="noopener">${t('ui.source')}</a>`;
+  label(...labelArgs); msg(...msgArgs);
+  if (ovDraw) ovDraw();
+  if (D) D.frog.croak.textContent = t('frog.croak');
+  if (E && E.banner) E.banner.textContent = t('end.banner');
+}
+$('#lang').addEventListener('change', e => {
+  LANG = e.target.value; store('ff_lang', LANG);
+  applyLang(); e.target.blur();
+});
 
 // ============ DAY ============
 const DAY_LAYOUTS = [
@@ -618,7 +909,7 @@ function makeFrog(p, x, y) {
     eyes.push({ x: ex, y: ey });
   });
   const zzz = el('text', { x: 38, y: -40, fill: '#fff', 'font-size': 16, 'font-weight': 'bold' }, g); zzz.textContent = 'z z z';
-  const croak = el('text', { x: 0, y: -48, fill: '#fff', 'font-size': 18, 'font-weight': 'bold', 'text-anchor': 'middle', stroke: '#24602a', 'stroke-width': 3, 'paint-order': 'stroke' }, g); croak.textContent = 'CROAK…';
+  const croak = el('text', { x: 0, y: -48, fill: '#fff', 'font-size': 18, 'font-weight': 'bold', 'text-anchor': 'middle', stroke: '#24602a', 'stroke-width': 3, 'paint-order': 'stroke' }, g); croak.textContent = t('frog.croak');
   const bang = el('text', { x: 0, y: -46, fill: '#ff3b3b', 'font-size': 36, 'font-weight': 'bold', 'text-anchor': 'middle', stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke' }, g); bang.textContent = '!';
   return { g, x, y, eyes, pupils, lids, sac, zzz, croak, bang, lid: 1, mouth: { x, y: y + 8 } };
 }
@@ -684,14 +975,18 @@ async function startDay() {
   const tok = ++runToken;
   phase = 'day'; N = null; E = null;
   buildDay(); A.setMode('day'); A.busy = false;
-  label(`☀ Day ${G.day}/3`); chipsEl.innerHTML = ''; msg('');
-  let html = `<h2>☀ Day ${G.day}</h2>
-    <p>Fly <b>right</b> (<kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd> / buttons) to reach the <b>big leaf</b> on the other side.</p>
-    <p>When the frog <b>croaks</b>, hide <b>under a leaf</b> before it opens its eyes!</p>
-    <p class="tag">If it catches you, you start over from Day 1.</p>`;
-  if (G.day > 1) html += `<p class="warn">💧 Careful: leaves holding water may give way!</p>`;
-  if (G.easy) html += `<p class="warn">She wasn't impressed last night… but luck is on your side: the frog is about to snack on another firefly. Today will be easier.</p>`;
-  await overlay(html, 'Fly!');
+  label('day.label', { d: G.day }); chipsEl.innerHTML = ''; msg('');
+  const day = G.day, easy = G.easy;
+  const html = () => {
+    let h = `<h2>${t('day.h', { d: day })}</h2>
+    <p>${t('day.p1', { lr: KEYS_LR })}</p>
+    <p>${t('day.p2')}</p>
+    <p class="tag">${t('day.p3')}</p>`;
+    if (day > 1) h += `<p class="warn">${t('day.wet')}</p>`;
+    if (easy) h += `<p class="warn">${t('day.easy')}</p>`;
+    return h;
+  };
+  await overlay(html, () => t('day.go'));
   if (tok !== runToken) return;
   const tut = G.day === 1 && !tutorialSeen;
   if (G.easy || tut) {
@@ -699,10 +994,10 @@ async function startDay() {
     tutorialSeen = true;
     D.rival = makeFirefly(D.actors, { day: true, scale: 1 });
     D.rival.x = -30; D.rival.y = tut ? PY - 50 : PY - 80;
-    msg(tut ? 'Watch what happens to this firefly…' : 'Look! Another firefly…');
+    msg(tut ? 'msg.tutWatch' : 'msg.rival');
   } else {
     D.state = 'play';
-    msg('Hide under the leaves when the frog croaks!');
+    msg('msg.hide');
   }
 }
 function updateDay(dt) {
@@ -718,7 +1013,7 @@ function updateDay(dt) {
       D.hitT += dt;
       if (tongueStep(D.hitT, D.tgt, r) && !D.rivalDone) {
         D.rivalDone = true; D.fs = 'sleep';
-        msg('Gulp! The frog is full and drowsy. Go now!');
+        msg('msg.gulpFull');
         setTimeout(() => { if (D && D.state === 'intro') { D.state = 'play'; D.ft = D.prm.calmMax; } }, 1200);
       }
     }
@@ -740,15 +1035,15 @@ function updateDay(dt) {
     else if (D.fs === 'warn' && D.ft <= 0) { D.fs = 'look'; D.ft = D.prm.look; A.alert(); }
     else if (D.fs === 'look') {
       if (!D.hidden) {
-        D.state = 'caught'; D.ct = 0; D.tgt = { x: p.x, y: p.y }; A.gulp(); msg('Spotted!');
+        D.state = 'caught'; D.ct = 0; D.tgt = { x: p.x, y: p.y }; A.gulp(); msg('msg.spotted');
       } else if (D.ft <= 0) { D.fs = 'sleep'; D.ft = rand(D.prm.calmMin, D.prm.calmMax); }
     }
     if (D.state === 'play') {
       if (p.x >= 720) winDay();
-      else if (D.alertT > 0 && D.fs !== 'warn') msg('Splash! The wet leaf fell — that hideout is gone!');
-      else if (D.fs === 'sleep') msg(D.hidden ? '🍃 Hidden — the frog is dozing, keep flying!' : 'The frog is dozing… keep flying!');
-      else if (D.fs === 'warn') msg(D.hidden ? '🍃 Hidden — stay put!' : '⚠ CROAK! Get under a leaf!');
-      else msg('🍃 Stay still… it is watching');
+      else if (D.alertT > 0 && D.fs !== 'warn') msg('msg.splash');
+      else if (D.fs === 'sleep') msg(D.hidden ? 'msg.dozeHidden' : 'msg.doze');
+      else if (D.fs === 'warn') msg(D.hidden ? 'msg.warnHidden' : 'msg.warn');
+      else msg('msg.look');
     }
   } else if (D.state === 'caught') {
     D.ct += dt;
@@ -767,12 +1062,12 @@ function updateTutorial(dt, r) {
   if (!D.rivalHit) {
     if (D.fs === 'sleep') {
       r.x += 120 * dt; r.y = PY - 50 + Math.sin(T * 5) * 6;
-      if (r.x >= 150) { D.fs = 'warn'; D.ft = 1.5; A.croak(); msg('CROAK! The frog is waking up — hide under a leaf!'); }
+      if (r.x >= 150) { D.fs = 'warn'; D.ft = 1.5; A.croak(); msg('msg.tutCroak'); }
     } else if (D.fs === 'warn') {
       r.x += (220 - r.x) * Math.min(1, dt * 3) + Math.sin(T * 20) * 1.5;
       r.y += (PY - r.y) * Math.min(1, dt * 3);
       D.ft -= dt;
-      if (D.ft <= 0) { D.fs = 'look'; D.ft = .5; A.alert(); msg('Too late — it is not under a leaf!'); }
+      if (D.ft <= 0) { D.fs = 'look'; D.ft = .5; A.alert(); msg('msg.tutLate'); }
     } else {
       D.ft -= dt;
       if (D.ft <= 0) { D.rivalHit = true; D.hitT = 0; D.tgt = { x: r.x, y: r.y }; A.gulp(); }
@@ -781,7 +1076,7 @@ function updateTutorial(dt, r) {
     D.hitT += dt;
     if (tongueStep(D.hitT, D.tgt, r) && !D.rivalDone) {
       D.rivalDone = true;
-      msg('Gulp! When it croaks, get under a leaf and wait until it dozes off.');
+      msg('msg.tutGulp');
       setTimeout(() => { if (D && D.state === 'intro') { D.fs = 'sleep'; D.state = 'play'; D.ft = D.prm.calmMax; } }, 2800);
     }
   }
@@ -789,7 +1084,7 @@ function updateTutorial(dt, r) {
 function winDay() {
   const tok = runToken;
   D.state = 'won'; D.fs = 'sleep'; A.win(); G.easy = false;
-  msg('Safe on the big leaf! The sun is setting…');
+  msg('msg.safe');
   setTimeout(() => { if (tok === runToken) fade(() => runNight()); }, 1700);
 }
 function onCaught() {
@@ -798,7 +1093,7 @@ function onCaught() {
   setTimeout(async () => {
     if (tok !== runToken) return;
     A.setMode('sad');
-    await overlay(`<h2>Gulp!</h2><p>The frog caught you. Love will have to wait…</p><p class="tag">Everything starts again from Day 1.</p>`, 'Try again');
+    await overlay(() => t('caught.html'), () => t('caught.btn'));
     if (tok !== runToken) return;
     newGame(); startDay();
   }, 900);
@@ -924,27 +1219,27 @@ async function runNight() {
   const n = G.day;
   phase = 'night'; D = null; E = null;
   buildNight(); A.setMode('night'); A.busy = false;
-  label(`☾ Night ${n}/3`); chipsEl.innerHTML = '';
+  label('night.label', { n }); chipsEl.innerHTML = '';
   const need = Math.max(0, 75 - G.likeness);
-  await say(n === 3 ? `Final night! She needs ${Math.ceil(need)}% more to choose you.` : `Night ${n}. She's watching… copy her light dance!`, 2400);
+  await say(2400, n === 3 ? 'msg.finalNight' : 'msg.nightStart', { n, need: Math.ceil(need) });
   if (tok !== runToken) return;
   let score = 0, total = 0;
   const challenges = NIGHTS[n - 1];
   for (let ci = 0; ci < challenges.length; ci++) {
     const lens = challenges[ci];
-    await say(lens.length > 1 ? `Challenge ${ci + 1}/${challenges.length} — ${lens.length} patterns in a row!` : `Challenge ${ci + 1}/${challenges.length}`, 1300);
+    await say(1300, lens.length > 1 ? 'msg.challengeMulti' : 'msg.challenge', { i: ci + 1, t: challenges.length, k: lens.length });
     if (tok !== runToken) return;
     for (let pi = 0; pi < lens.length; pi++) {
       const pat = genPattern(lens[pi], n);
       const tag = lens.length > 1 ? ` (${pi + 1}/${lens.length})` : '';
       A.busy = true;
       renderChips(pat, 'show');
-      msg('Watch her…' + tag);
+      msg('msg.watch', { tag });
       await wait(350);
       await playDemo(pat);
       if (tok !== runToken) return;
       renderChips(pat, n === 1 ? 'ghost' : 'hidden');
-      msg((n === 1 ? 'Your turn! (tap = short, hold = long)' : 'Your turn! From memory…') + tag);
+      msg(n === 1 ? 'msg.yourTurn1' : 'msg.yourTurn', { tag });
       let pScore = 0;
       for (let i = 0; i < pat.length; i++) {
         chipClass(i, 'cur', true);
@@ -959,7 +1254,7 @@ async function runNight() {
       score += pScore; total += pat.length;
       const ratio = pScore / pat.length;
       femaleReact(ratio);
-      msg(ratio >= .99 ? 'Perfect! ♥' : ratio >= .6 ? 'Nice!' : 'Hmm… not quite.');
+      msg(ratio >= .99 ? 'msg.perfect' : ratio >= .6 ? 'msg.nice' : 'msg.notQuite');
       await wait(1100);
       if (tok !== runToken) return;
     }
@@ -970,16 +1265,20 @@ async function runNight() {
   G.likeness = Math.min(100, G.likeness + gain);
   G.perfs.push(perf);
   const pct = Math.round(perf * 100), poor = perf < .6;
-  const mood = perf >= .95 ? 'She is glowing just for you!' : perf >= .6 ? 'She liked your dance!' : 'She looks unimpressed…';
-  let html = `<h2>☾ Night ${n} complete</h2>
-    <p class="big">Performance: ${pct}%</p>
-    <p>${mood}</p>
-    <p>Her likeness: <b>+${Math.round(gain)}%</b> → <b style="color:#ff8fc0">${Math.round(G.likeness)}%</b></p>`;
-  if (n < 3) {
-    html += `<p class="tag">Goal: at least 75% by the end of Night 3.</p>`;
-    if (poor) html += `<p class="warn">Tomorrow the frog will find an easier meal than you…</p>`;
-  }
-  await overlay(html, n < 3 ? 'Sleep until morning' : 'See what happens…');
+  const mood = perf >= .95 ? 'mood.great' : perf >= .6 ? 'mood.good' : 'mood.poor';
+  const like = { g: Math.round(gain), l: Math.round(G.likeness) };
+  const html = () => {
+    let h = `<h2>${t('night.h', { n })}</h2>
+    <p class="big">${t('night.perf', { p: pct })}</p>
+    <p>${t(mood)}</p>
+    <p>${t('night.like', like)}</p>`;
+    if (n < 3) {
+      h += `<p class="tag">${t('night.goal')}</p>`;
+      if (poor) h += `<p class="warn">${t('night.poor')}</p>`;
+    }
+    return h;
+  };
+  await overlay(html, () => t(n < 3 ? 'night.sleep' : 'night.end'));
   if (tok !== runToken) return;
   if (n === 3) fade(() => showEnding());
   else { G.day++; G.easy = poor; fade(() => startDay()); }
@@ -1023,8 +1322,8 @@ function buildEnding(type) {
       const shineG = el('g', { 'clip-path': 'url(#bannerClip)' }, b);
       const sh = el('rect', { x: -320, y: -40, width: 50, height: 80, fill: '#fff', opacity: .55, transform: 'skewX(-20)' }, shineG);
       el('animate', { attributeName: 'x', from: -360, to: 360, dur: '2.4s', repeatCount: 'indefinite' }, sh);
-      const tx = el('text', { x: 0, y: 8, 'text-anchor': 'middle', 'font-size': 27, 'font-weight': 'bold', fill: '#5a3600', 'font-family': 'Trebuchet MS, sans-serif' }, b);
-      tx.textContent = '★ 100% PERFECT MATCH ★';
+      const tx = el('text', { x: 0, y: 8, 'text-anchor': 'middle', 'font-size': 27, 'font-weight': 'bold', fill: '#5a3600', 'font-family': 'Trebuchet MS, PingFang SC, Microsoft YaHei, sans-serif' }, b);
+      tx.textContent = t('end.banner'); E.banner = tx;
       for (let i = 0; i < 14; i++) {
         const s = el('path', { d: 'M0 -6 L1.5 -1.5 L6 0 L1.5 1.5 L0 6 L-1.5 1.5 L-6 0 L-1.5 -1.5Z', fill: '#fff6c0', transform: `translate(${rand(-290, 290)},${rand(-55, 55)})`, class: 'twinkle' }, b);
         s.style.animationDelay = `${rand(-3, 0)}s`;
@@ -1051,14 +1350,11 @@ async function showEnding() {
   const type = L >= 100 ? 'best' : L >= 75 ? 'good' : 'bad';
   phase = 'ending'; D = null; N = null;
   buildEnding(type); A.setMode(type === 'bad' ? 'sad' : 'love');
-  chipsEl.innerHTML = ''; msg(''); label('The End');
-  const nights = G.perfs.map((p, i) => `Night ${i + 1}: ${Math.round(p * 100)}%`).join(' · ');
-  const html = {
-    bad: `<h2>Bad Ending — Alone</h2><p>She flew off with another firefly (${L}% likeness). The pumpkins keep glowing, but your nights stay dark…</p>`,
-    good: `<h2>Good Ending — Together ♥</h2><p>She chose you (${L}% likeness)! Before long the grove sparkled with your little ones.</p>`,
-    best: `<h2>Best Ending — 100%! ✨</h2><p>A flawless courtship! Now the whole grove shines with your enormous family.</p>`,
-  }[type] + `<p class="tag">${nights}</p>`;
-  await overlay(html, 'Play again', true);
+  chipsEl.innerHTML = ''; msg(''); label('end.label');
+  const perfs = G.perfs.slice();
+  const html = () => t('end.' + type, { l: L }) +
+    `<p class="tag">${perfs.map((p, i) => t('end.night', { i: i + 1, p: Math.round(p * 100) })).join(' · ')}</p>`;
+  await overlay(html, () => t('end.again'), true);
   if (tok !== runToken) return;
   newGame(); fade(() => startDay());
 }
@@ -1067,14 +1363,9 @@ async function showEnding() {
 async function title() {
   phase = 'title';
   buildNight(); label(''); msg('');
-  await overlay(`<h1>Firefly Night</h1>
-    <p class="tag">“It only comes out at night.”</p>
-    <p>You are a lovesick <b>male firefly</b>. In 3 days, you must win the heart of the female who glows above the pumpkin grove.</p>
-    <p>☀ <b>By day</b>, fly across the grove and hide under leaves from the hungry frog.</p>
-    <p>☾ <b>By night</b>, repeat her light dance: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, arrow keys or the buttons.<br>
-       <b>Tap</b> for a short flash <span style="color:#ffd34d">→</span>, <b>hold ½ second</b> for a long one <span style="color:#ffd34d">→━</span>.</p>
-    <p>Reach <b>75%</b> likeness by the third night. Perfection is rewarded…</p>
-    <p class="tag">Press <kbd>M</kbd> to toggle music.</p>`, 'Start');
+  await overlay(() => `<h1>Firefly Night</h1>
+    <p class="tag">${t('title.tag')}</p>
+    ${t('title.body', { wasd: KEYS_WASD, short: SHORT, long: LONGF })}`, () => t('title.start'));
   newGame(); fade(() => startDay());
 }
 
@@ -1088,6 +1379,7 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+applyLang();
 title();
 </script>
 </body>
